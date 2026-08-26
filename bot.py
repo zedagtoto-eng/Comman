@@ -115,7 +115,7 @@ def is_ticket_channel(channel):
 
     return (
         channel.category is not None
-        and channel.category.id == 1541096510102437911
+        and channel.category.id == TICKET_CATEGORY_ID
     )
 
 
@@ -828,10 +828,12 @@ async def profile_error(ctx, error):
 # $FILL
 # ============================================================
 # Fills the roles of the person who runs the command.
-# No @user is required.
 #
 # Usage:
 # $fill
+#
+# The bot will ONLY attempt to add roles that are actually
+# manageable by Discord's role hierarchy.
 # ============================================================
 
 @bot.command(name="fill")
@@ -840,7 +842,23 @@ async def fill(ctx):
 
     member = ctx.author
 
-    bot_top = ctx.guild.me.top_role
+    # --------------------------------------------------------
+    # GET BOT MEMBER
+    # --------------------------------------------------------
+
+    bot_member = ctx.guild.me
+
+    if bot_member is None:
+
+        return await ctx.send(
+            "❌ I couldn't find my bot member in this server."
+        )
+
+    bot_top_role = bot_member.top_role
+
+    # --------------------------------------------------------
+    # USER'S HIGHEST ROLE
+    # --------------------------------------------------------
 
     highest_member_role = member.top_role
 
@@ -850,60 +868,215 @@ async def fill(ctx):
             f"❌ {member.mention} has no role to fill below."
         )
 
-    roles_to_add = [
-        role
-        for role in ctx.guild.roles
+    # --------------------------------------------------------
+    # FIND MANAGEABLE ROLES
+    # --------------------------------------------------------
+
+    roles_to_add = []
+
+    for role in ctx.guild.roles:
+
+        # Never add @everyone
+        if role == ctx.guild.default_role:
+            continue
+
+        # Bot cannot manage its own role or anything above it.
+        if role >= bot_top_role:
+            continue
+
+        # Only roles BELOW the user's highest role.
+        if role.position >= highest_member_role.position:
+            continue
+
+        # Don't add roles already owned.
+        if role in member.roles:
+            continue
+
+        # ----------------------------------------------------
+        # USER HIERARCHY CHECK
+        # ----------------------------------------------------
+
         if (
-            role != ctx.guild.default_role
-            and role.position < highest_member_role.position
-            and role < bot_top
-            and role not in member.roles
-        )
-    ]
+            ctx.author != ctx.guild.owner
+            and role >= ctx.author.top_role
+        ):
+            continue
 
-    if ctx.author != ctx.guild.owner:
+        roles_to_add.append(role)
 
-        roles_to_add = [
-            role
-            for role in roles_to_add
-            if role < ctx.author.top_role
-        ]
+    # --------------------------------------------------------
+    # NO ROLES
+    # --------------------------------------------------------
 
     if not roles_to_add:
 
         return await ctx.send(
-            "❌ There are no missing manageable roles "
+            "❌ There are no roles that I can safely add "
             "below your highest role."
         )
 
-    try:
+    # --------------------------------------------------------
+    # LOWEST → HIGHEST
+    # --------------------------------------------------------
 
-        await member.add_roles(
-            *roles_to_add,
-            reason=f"Fill roles by {ctx.author}"
-        )
+    roles_to_add.sort(
+        key=lambda role: role.position
+    )
 
-    except discord.Forbidden:
+    added_roles = []
+    failed_roles = []
+
+    # --------------------------------------------------------
+    # ADD EACH ROLE
+    # --------------------------------------------------------
+
+    for role in roles_to_add:
+
+        # Final hierarchy check
+        if role >= bot_top_role:
+
+            failed_roles.append(role)
+            continue
+
+        try:
+
+            await member.add_roles(
+                role,
+                reason=f"Fill roles by {ctx.author}"
+            )
+
+            added_roles.append(role)
+
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ):
+
+            failed_roles.append(role)
+
+    # --------------------------------------------------------
+    # NOTHING ADDED
+    # --------------------------------------------------------
+
+    if not added_roles and failed_roles:
 
         return await ctx.send(
-            "❌ I don't have permission to add one or more "
-            "of these roles. Make sure my bot role is above them."
+            "❌ I couldn't add any of the roles.\n"
+            "Make sure my bot's highest role is above "
+            "the roles I need to manage."
         )
 
-    await ctx.send(
-        f"✅ Filled **{len(roles_to_add)}** roles below "
-        f"your highest role."
+    # --------------------------------------------------------
+    # EMBED
+    # --------------------------------------------------------
+
+    embed = discord.Embed(
+        title="🎭 Roles Filled",
+        description=(
+            f"Successfully filled the manageable roles "
+            f"for {member.mention}."
+        ),
+        color=discord.Color.from_rgb(255, 20, 180)
     )
+
+    embed.add_field(
+        name="👤 User",
+        value=member.mention,
+        inline=False
+    )
+
+    embed.add_field(
+        name="✅ Roles Added",
+        value=f"**{len(added_roles)}**",
+        inline=True
+    )
+
+    embed.add_field(
+        name="⚠️ Roles Skipped",
+        value=f"**{len(failed_roles)}**",
+        inline=True
+    )
+
+    if added_roles:
+
+        added_text = ", ".join(
+            role.mention
+            for role in added_roles
+        )
+
+        if len(added_text) > 1024:
+
+            added_text = (
+                added_text[:1000]
+                + "..."
+            )
+
+        embed.add_field(
+            name="🎭 Added Roles",
+            value=added_text,
+            inline=False
+        )
+
+    if failed_roles:
+
+        failed_text = ", ".join(
+            role.mention
+            for role in failed_roles
+        )
+
+        if len(failed_text) > 1024:
+
+            failed_text = (
+                failed_text[:1000]
+                + "..."
+            )
+
+        embed.add_field(
+            name="⚠️ Skipped Roles",
+            value=failed_text,
+            inline=False
+        )
+
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
+
+    embed.set_footer(
+        text=f"Filled by {ctx.author}"
+    )
+
+    await ctx.send(embed=embed)
 
 
 @fill.error
 async def fill_error(ctx, error):
 
-    if isinstance(error, commands.MissingPermissions):
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
 
         await ctx.send(
             "❌ You need the **Manage Roles** permission."
         )
+
+    elif isinstance(
+        error,
+        commands.CommandInvokeError
+    ):
+
+        original = error.original
+
+        if isinstance(
+            original,
+            discord.Forbidden
+        ):
+
+            await ctx.send(
+                "❌ Discord rejected the role change. "
+                "Check that my highest role is above "
+                "the roles I need to manage."
+            )
 
 
 # ============================================================
@@ -1088,10 +1261,6 @@ async def temp(ctx):
             "❌ You are already temporarily demoted."
         )
 
-    # --------------------------------------------------------
-    # SAVE ALL ORIGINAL ROLES
-    # --------------------------------------------------------
-
     current_roles = [
         role.id
         for role in member.roles
@@ -1101,10 +1270,6 @@ async def temp(ctx):
     temp_data[user_id] = current_roles
 
     save_temp_data(temp_data)
-
-    # --------------------------------------------------------
-    # REMOVE MANAGEABLE ROLES EXCEPT PROTECTED
-    # --------------------------------------------------------
 
     roles_to_remove = [
         role
@@ -1138,8 +1303,8 @@ async def temp(ctx):
             save_temp_data(temp_data)
 
             return await ctx.send(
-                "❌ I don't have permission to remove one or "
-                "more of these roles."
+                "❌ I don't have permission to remove one "
+                "or more of these roles."
             )
 
     kept_roles = [
@@ -1431,18 +1596,10 @@ async def claim(ctx):
             "❌ I need **Manage Channels** permission."
         )
 
-    # --------------------------------------------------------
-    # FIND MIDDLEMAN ROLE
-    # --------------------------------------------------------
-
     middleman_role = discord.utils.find(
         lambda role: role.name.lower() == "middleman",
         ctx.guild.roles
     )
-
-    # --------------------------------------------------------
-    # HIDE FROM MIDDLEMEN
-    # --------------------------------------------------------
 
     if middleman_role:
 
@@ -1456,10 +1613,6 @@ async def claim(ctx):
 
         except discord.Forbidden:
             pass
-
-    # --------------------------------------------------------
-    # GIVE CLAIMER ACCESS
-    # --------------------------------------------------------
 
     try:
 
@@ -1713,10 +1866,6 @@ async def transferticket(
             "❌ I need **Manage Channels** permission."
         )
 
-    # --------------------------------------------------------
-    # REMOVE OLD CLAIMER
-    # --------------------------------------------------------
-
     if (
         claimed_id
         and claimed_id != member.id
@@ -1739,10 +1888,6 @@ async def transferticket(
             except discord.Forbidden:
                 pass
 
-    # --------------------------------------------------------
-    # HIDE FROM MIDDLEMEN
-    # --------------------------------------------------------
-
     middleman_role = discord.utils.find(
         lambda role: role.name.lower() == "middleman",
         ctx.guild.roles
@@ -1760,10 +1905,6 @@ async def transferticket(
 
         except discord.Forbidden:
             pass
-
-    # --------------------------------------------------------
-    # GIVE NEW MEMBER ACCESS
-    # --------------------------------------------------------
 
     try:
 
