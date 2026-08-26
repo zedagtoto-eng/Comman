@@ -45,19 +45,15 @@ TEMP_FILE = "temp_roles.json"
 # ============================================================
 # PUT THE 2 ROLE IDs YOU WANT TO KEEP HERE.
 #
-# Example:
-#
-# TEMP_KEEP_ROLE_IDS = [
-#     154109123456789012,
-#     154109987654321098
-# ]
-#
-# DO NOT USE A COLON (:)
+# These roles will:
+# 1. Stay on the user when $temp is used.
+# 2. Be saved together with all the user's original roles.
+# 3. Be restored by $canceltemp.
 # ============================================================
 
 TEMP_KEEP_ROLE_IDS = [
-    123456789012345678,  # KEEP ROLE 1
-    987654321098765432   # KEEP ROLE 2
+    1541096480146853968,  # KEEP ROLE 1
+    1541096476610928730   # KEEP ROLE 2
 ]
 
 
@@ -110,10 +106,14 @@ def save_temp_data(data):
 async def addvouch(ctx, member: discord.Member, amount: int = 1):
 
     if member.bot:
-        return await ctx.send("❌ You cannot add a vouch to a bot.")
+        return await ctx.send(
+            "❌ You cannot add a vouch to a bot."
+        )
 
     if amount <= 0:
-        return await ctx.send("❌ The number must be greater than 0.")
+        return await ctx.send(
+            "❌ The number must be greater than 0."
+        )
 
     vouches = load_vouches()
     user_id = str(member.id)
@@ -145,7 +145,9 @@ async def addvouch(ctx, member: discord.Member, amount: int = 1):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     embed.set_footer(
         text=f"Vouch profile • {member.display_name}"
@@ -182,7 +184,9 @@ async def addvouch_error(ctx, error):
 async def removevouch(ctx, member: discord.Member, amount: int = 1):
 
     if amount <= 0:
-        return await ctx.send("❌ The number must be greater than 0.")
+        return await ctx.send(
+            "❌ The number must be greater than 0."
+        )
 
     vouches = load_vouches()
     user_id = str(member.id)
@@ -223,7 +227,9 @@ async def removevouch(ctx, member: discord.Member, amount: int = 1):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     await ctx.send(embed=embed)
 
@@ -277,7 +283,9 @@ async def vouches_command(ctx, member: discord.Member = None):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     embed.set_footer(
         text=f"Vouch profile • {member.display_name}"
@@ -295,7 +303,9 @@ async def vouches_command(ctx, member: discord.Member = None):
 async def role_command(ctx, member: discord.Member, role: discord.Role):
 
     if role == ctx.guild.default_role:
-        return await ctx.send("❌ You cannot give the @everyone role.")
+        return await ctx.send(
+            "❌ You cannot give the @everyone role."
+        )
 
     if role >= ctx.guild.me.top_role:
         return await ctx.send(
@@ -353,7 +363,9 @@ async def role_error(ctx, error):
 async def promo(ctx, member: discord.Member):
 
     if member.bot:
-        return await ctx.send("❌ You cannot promote a bot.")
+        return await ctx.send(
+            "❌ You cannot promote a bot."
+        )
 
     bot_top = ctx.guild.me.top_role
 
@@ -364,15 +376,23 @@ async def promo(ctx, member: discord.Member):
         and role < bot_top
     ]
 
-    manageable_roles.sort(key=lambda r: r.position)
+    manageable_roles.sort(
+        key=lambda r: r.position
+    )
 
     current_manageable = [
-        role for role in member.roles
+        role
+        for role in member.roles
         if role in manageable_roles
     ]
 
     if not current_manageable:
-        next_role = manageable_roles[0] if manageable_roles else None
+        next_role = (
+            manageable_roles[0]
+            if manageable_roles
+            else None
+        )
+
     else:
         highest_current = max(
             current_manageable,
@@ -386,7 +406,10 @@ async def promo(ctx, member: discord.Member):
         ]
 
         next_role = (
-            min(higher_roles, key=lambda r: r.position)
+            min(
+                higher_roles,
+                key=lambda r: r.position
+            )
             if higher_roles
             else None
         )
@@ -402,7 +425,6 @@ async def promo(ctx, member: discord.Member):
             "than your highest role."
         )
 
-    # Remove current manageable rank
     remove_roles = [
         role
         for role in current_manageable
@@ -410,7 +432,10 @@ async def promo(ctx, member: discord.Member):
     ]
 
     if remove_roles:
-        await member.remove_roles(*remove_roles)
+        await member.remove_roles(
+            *remove_roles,
+            reason=f"Promotion by {ctx.author}"
+        )
 
     await member.add_roles(
         next_role,
@@ -451,7 +476,9 @@ async def promo_error(ctx, error):
 async def demo(ctx, member: discord.Member):
 
     if member.bot:
-        return await ctx.send("❌ You cannot demote a bot.")
+        return await ctx.send(
+            "❌ You cannot demote a bot."
+        )
 
     bot_top = ctx.guild.me.top_role
 
@@ -462,7 +489,9 @@ async def demo(ctx, member: discord.Member):
         and role < bot_top
     ]
 
-    manageable_roles.sort(key=lambda r: r.position)
+    manageable_roles.sort(
+        key=lambda r: r.position
+    )
 
     current_manageable = [
         role
@@ -487,12 +516,16 @@ async def demo(ctx, member: discord.Member):
     ]
 
     next_role = (
-        max(lower_roles, key=lambda r: r.position)
+        max(
+            lower_roles,
+            key=lambda r: r.position
+        )
         if lower_roles
         else None
     )
 
     if next_role is None:
+
         await member.remove_roles(
             highest_current,
             reason=f"Demotion by {ctx.author}"
@@ -509,6 +542,7 @@ async def demo(ctx, member: discord.Member):
     )
 
     if next_role != ctx.guild.default_role:
+
         await member.add_roles(
             next_role,
             reason=f"Demotion by {ctx.author}"
@@ -542,7 +576,6 @@ async def demo_error(ctx, error):
 # ============================================================
 # $W @USER
 # USER PROFILE
-# VOUCHES ARE REPLACED WITH ROLE PERMISSIONS
 # ============================================================
 
 @bot.command(name="w")
@@ -601,7 +634,9 @@ async def profile(ctx, member: discord.Member = None):
 
     embed.add_field(
         name=f"🎭 Roles [{len(roles)}]",
-        value=", ".join(roles) if roles else "No roles",
+        value=", ".join(roles)
+        if roles
+        else "No roles",
         inline=False
     )
 
@@ -624,8 +659,15 @@ async def profile(ctx, member: discord.Member = None):
     }
 
     for attribute, display_name in permission_map.items():
-        if getattr(permissions, attribute, False):
-            permission_names.append(display_name)
+
+        if getattr(
+            permissions,
+            attribute,
+            False
+        ):
+            permission_names.append(
+                display_name
+            )
 
     embed.add_field(
         name="🔐 Role Permissions",
@@ -635,7 +677,9 @@ async def profile(ctx, member: discord.Member = None):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     embed.set_footer(
         text=f"User profile • {member.display_name}"
@@ -663,7 +707,6 @@ async def profile_error(ctx, error):
 async def fill(ctx, member: discord.Member):
 
     bot_top = ctx.guild.me.top_role
-
     highest_member_role = member.top_role
 
     if highest_member_role == ctx.guild.default_role:
@@ -686,8 +729,8 @@ async def fill(ctx, member: discord.Member):
             f"{member.mention}'s highest role."
         )
 
-    # Only roles the command user is allowed to manage
     if ctx.author != ctx.guild.owner:
+
         roles_to_add = [
             role
             for role in roles_to_add
@@ -737,11 +780,14 @@ async def fill_error(ctx, error):
 @bot.command(name="roles")
 async def roles_command(ctx):
 
-    roles = list(reversed(ctx.guild.roles))
+    roles = list(
+        reversed(ctx.guild.roles)
+    )
 
     role_lines = []
 
     for role in roles:
+
         if role == ctx.guild.default_role:
             continue
 
@@ -750,13 +796,15 @@ async def roles_command(ctx):
         )
 
     if not role_lines:
-        return await ctx.send("❌ No roles found.")
+        return await ctx.send(
+            "❌ No roles found."
+        )
 
-    # Discord message limit protection
     chunks = []
     current = ""
 
     for line in role_lines:
+
         if len(current) + len(line) + 1 > 4000:
             chunks.append(current)
             current = ""
@@ -769,8 +817,14 @@ async def roles_command(ctx):
     for index, chunk in enumerate(chunks):
 
         embed = discord.Embed(
-            title=f"🎭 Server Roles"
-            + (f" — Page {index + 1}" if len(chunks) > 1 else ""),
+            title=(
+                "🎭 Server Roles"
+                + (
+                    f" — Page {index + 1}"
+                    if len(chunks) > 1
+                    else ""
+                )
+            ),
             description=chunk,
             color=discord.Color.from_rgb(255, 20, 180)
         )
@@ -779,7 +833,9 @@ async def roles_command(ctx):
             text=f"{len(ctx.guild.roles) - 1} roles"
         )
 
-        await ctx.send(embed=embed)
+        await ctx.send(
+            embed=embed
+        )
 
 
 # ============================================================
@@ -856,46 +912,62 @@ async def serverinfo(ctx):
         text=f"Server info • {guild.name}"
     )
 
-    await ctx.send(embed=embed)
+    await ctx.send(
+        embed=embed
+    )
 
 
 # ============================================================
-# $TEMP @USER
-# Removes all manageable roles except the 2 protected roles
+# $TEMP
+# ============================================================
+# IMPORTANT:
+# $temp now works WITHOUT @user.
+#
+# It temps the person who runs the command.
+#
+# Example:
+# $temp
+#
+# The 2 roles inside TEMP_KEEP_ROLE_IDS stay on the user.
+# ALL original roles are saved, including those 2 roles.
 # ============================================================
 
 @bot.command(name="temp")
 @commands.has_permissions(manage_roles=True)
-async def temp(ctx, member: discord.Member):
+async def temp(ctx):
+
+    member = ctx.author
 
     if member.bot:
         return await ctx.send(
             "❌ You cannot temp a bot."
         )
 
-    if member == ctx.author:
-        return await ctx.send(
-            "❌ You cannot temp yourself."
-        )
-
     bot_top = ctx.guild.me.top_role
 
     if member.top_role >= bot_top:
         return await ctx.send(
-            "❌ I cannot manage this member because their highest "
+            "❌ I cannot manage you because your highest "
             "role is equal to or higher than my highest role."
         )
 
     temp_data = load_temp_data()
     user_id = str(member.id)
 
-    # Prevent overwriting the original saved roles
+    # --------------------------------------------------------
+    # Prevent overwriting saved roles
+    # --------------------------------------------------------
+
     if user_id in temp_data:
         return await ctx.send(
-            f"❌ {member.mention} is already temporarily demoted."
+            "❌ You are already temporarily demoted."
         )
 
-    # Save all current roles except @everyone
+    # --------------------------------------------------------
+    # SAVE ALL CURRENT ROLES
+    # Including the 2 protected roles.
+    # --------------------------------------------------------
+
     current_roles = [
         role.id
         for role in member.roles
@@ -905,7 +977,11 @@ async def temp(ctx, member: discord.Member):
     temp_data[user_id] = current_roles
     save_temp_data(temp_data)
 
-    # Remove all manageable roles EXCEPT protected roles
+    # --------------------------------------------------------
+    # REMOVE ALL MANAGEABLE ROLES
+    # EXCEPT THE 2 PROTECTED ROLES
+    # --------------------------------------------------------
+
     roles_to_remove = [
         role
         for role in member.roles
@@ -915,10 +991,15 @@ async def temp(ctx, member: discord.Member):
     ]
 
     if roles_to_remove:
+
         await member.remove_roles(
             *roles_to_remove,
             reason=f"Temporary role removal by {ctx.author}"
         )
+
+    # --------------------------------------------------------
+    # GET PROTECTED ROLES THAT REMAIN
+    # --------------------------------------------------------
 
     kept_roles = [
         role.mention
@@ -926,8 +1007,15 @@ async def temp(ctx, member: discord.Member):
         if role.id in TEMP_KEEP_ROLE_IDS
     ]
 
+    # --------------------------------------------------------
+    # EMBED
+    # --------------------------------------------------------
+
     embed = discord.Embed(
         title="⏸️ Temporary Demotion",
+        description=(
+            f"{member.mention} has been temporarily demoted."
+        ),
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
@@ -952,6 +1040,12 @@ async def temp(ctx, member: discord.Member):
     )
 
     embed.add_field(
+        name="💾 Saved Roles",
+        value=f"**{len(current_roles)}** roles saved",
+        inline=False
+    )
+
+    embed.add_field(
         name="👮 Action By",
         value=ctx.author.mention,
         inline=False
@@ -961,7 +1055,13 @@ async def temp(ctx, member: discord.Member):
         url=member.display_avatar.url
     )
 
-    await ctx.send(embed=embed)
+    embed.set_footer(
+        text="Use $canceltemp @user to restore the saved roles"
+    )
+
+    await ctx.send(
+        embed=embed
+    )
 
 
 @temp.error
@@ -972,19 +1072,14 @@ async def temp_error(ctx, error):
             "❌ You need the **Manage Roles** permission."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
+    elif isinstance(error, commands.UnexpectedQuoteError):
         await ctx.send(
-            "❌ Usage: `$temp @user`"
-        )
-
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(
-            "❌ Please mention a valid member."
+            "❌ Invalid command format."
         )
 
 
 # ============================================================
-# $CANCELTEMP @USER
+# $CANCELTEMP 
 # Restores the roles saved by $temp
 # ============================================================
 
@@ -1020,18 +1115,28 @@ async def canceltemp(ctx, member: discord.Member):
             restored_roles.append(role)
 
     if restored_roles:
+
         await member.add_roles(
             *restored_roles,
             reason=f"Temporary demotion cancelled by {ctx.author}"
         )
 
-    # Remove saved data after restoring
+    # --------------------------------------------------------
+    # Delete saved data after restoration
+    # --------------------------------------------------------
+
     del temp_data[user_id]
     save_temp_data(temp_data)
 
+    # --------------------------------------------------------
+    # EMBED
+    # --------------------------------------------------------
+
     embed = discord.Embed(
         title="▶️ Temporary Demotion Cancelled",
-        description=f"Restored the saved roles for {member.mention}.",
+        description=(
+            f"Restored the saved roles for {member.mention}."
+        ),
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
@@ -1057,7 +1162,9 @@ async def canceltemp(ctx, member: discord.Member):
         url=member.display_avatar.url
     )
 
-    await ctx.send(embed=embed)
+    await ctx.send(
+        embed=embed
+    )
 
 
 @canceltemp.error
@@ -1085,8 +1192,18 @@ async def canceltemp_error(ctx, error):
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-    print(f"✅ Bot is running in {len(bot.guilds)} server(s)")
 
+    print(
+        f"✅ Logged in as {bot.user}"
+    )
+
+    print(
+        f"✅ Bot is running in {len(bot.guilds)} server(s)"
+    )
+
+
+# ============================================================
+# RUN
+# ============================================================
 
 bot.run(TOKEN)
