@@ -58,7 +58,6 @@ def save_vouches(data):
 # ============================================================
 # $ADDVOUCH
 # Usage: $addvouch @user number
-# Example: $addvouch @Drei 5
 # ============================================================
 
 @bot.command(name="addvouch")
@@ -66,9 +65,7 @@ def save_vouches(data):
 async def addvouch(ctx, member: discord.Member, amount: int):
 
     if member.bot:
-        return await ctx.send(
-            "❌ You cannot add vouches to a bot."
-        )
+        return await ctx.send("❌ You cannot add vouches to a bot.")
 
     if amount <= 0:
         return await ctx.send(
@@ -91,10 +88,7 @@ async def addvouch(ctx, member: discord.Member, amount: int):
 
     embed = discord.Embed(
         title="⭐ Vouches Added",
-        description=(
-            f"Successfully added **{amount}** vouch(es) "
-            f"to {member.mention}."
-        ),
+        description=f"Successfully added **{amount}** vouch(es) to {member.mention}.",
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
@@ -122,13 +116,8 @@ async def addvouch(ctx, member: discord.Member, amount: int):
         inline=False
     )
 
-    embed.set_thumbnail(
-        url=member.display_avatar.url
-    )
-
-    embed.set_footer(
-        text=f"Vouch profile • {member.display_name}"
-    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Vouch profile • {member.display_name}")
 
     await ctx.send(embed=embed)
 
@@ -137,9 +126,7 @@ async def addvouch(ctx, member: discord.Member, amount: int):
 async def addvouch_error(ctx, error):
 
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send(
-            "❌ You need the **Manage Messages** permission."
-        )
+        await ctx.send("❌ You need the **Manage Messages** permission.")
 
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(
@@ -157,7 +144,6 @@ async def addvouch_error(ctx, error):
 # ============================================================
 # $REMOVEVOUCH
 # Usage: $removevouch @user number
-# Example: $removevouch @Drei 2
 # ============================================================
 
 @bot.command(name="removevouch")
@@ -165,9 +151,7 @@ async def addvouch_error(ctx, error):
 async def removevouch(ctx, member: discord.Member, amount: int):
 
     if member.bot:
-        return await ctx.send(
-            "❌ You cannot remove vouches from a bot."
-        )
+        return await ctx.send("❌ You cannot remove vouches from a bot.")
 
     if amount <= 0:
         return await ctx.send(
@@ -205,10 +189,7 @@ async def removevouch(ctx, member: discord.Member, amount: int):
 
     embed = discord.Embed(
         title="⭐ Vouches Removed",
-        description=(
-            f"Successfully removed **{amount}** vouch(es) "
-            f"from {member.mention}."
-        ),
+        description=f"Successfully removed **{amount}** vouch(es) from {member.mention}.",
         color=discord.Color.red()
     )
 
@@ -236,13 +217,8 @@ async def removevouch(ctx, member: discord.Member, amount: int):
         inline=False
     )
 
-    embed.set_thumbnail(
-        url=member.display_avatar.url
-    )
-
-    embed.set_footer(
-        text=f"Vouch profile • {member.display_name}"
-    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Vouch profile • {member.display_name}")
 
     await ctx.send(embed=embed)
 
@@ -251,9 +227,7 @@ async def removevouch(ctx, member: discord.Member, amount: int):
 async def removevouch_error(ctx, error):
 
     if isinstance(error, commands.MissingPermissions):
-        await ctx.send(
-            "❌ You need the **Manage Messages** permission."
-        )
+        await ctx.send("❌ You need the **Manage Messages** permission.")
 
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(
@@ -274,10 +248,7 @@ async def removevouch_error(ctx, error):
 # ============================================================
 
 @bot.command(name="vouches")
-async def vouches_command(
-    ctx,
-    member: discord.Member = None
-):
+async def vouches_command(ctx, member: discord.Member = None):
 
     if member is None:
         member = ctx.author
@@ -302,13 +273,8 @@ async def vouches_command(
         inline=False
     )
 
-    embed.set_thumbnail(
-        url=member.display_avatar.url
-    )
-
-    embed.set_footer(
-        text=f"Vouch profile • {member.display_name}"
-    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Vouch profile • {member.display_name}")
 
     await ctx.send(embed=embed)
 
@@ -317,9 +283,322 @@ async def vouches_command(
 async def vouches_error(ctx, error):
 
     if isinstance(error, commands.BadArgument):
-        await ctx.send(
-            "❌ Please mention a valid member."
+        await ctx.send("❌ Please mention a valid member.")
+
+
+# ============================================================
+# $ROLE
+# Usage: $role @user @role
+# ============================================================
+
+@bot.command(name="role")
+@commands.has_permissions(manage_roles=True)
+@commands.bot_has_permissions(manage_roles=True)
+async def role_command(ctx, member: discord.Member, role: discord.Role):
+
+    if role.is_default():
+        return await ctx.send("❌ You cannot assign the @everyone role.")
+
+    if role.managed:
+        return await ctx.send(
+            "❌ You cannot manually assign a managed/integration role."
         )
+
+    if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send(
+            "❌ You cannot assign a role equal to or higher than your highest role."
+        )
+
+    if role >= ctx.guild.me.top_role:
+        return await ctx.send(
+            "❌ My highest role must be higher than the role you're assigning."
+        )
+
+    if role in member.roles:
+        return await ctx.send(
+            f"❌ {member.mention} already has {role.mention}."
+        )
+
+    try:
+        await member.add_roles(
+            role,
+            reason=f"Role added by {ctx.author}"
+        )
+
+        embed = discord.Embed(
+            title="✅ Role Added",
+            description=f"{role.mention} has been added to {member.mention}.",
+            color=discord.Color.green()
+        )
+
+        embed.add_field(
+            name="👤 User",
+            value=member.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="🎭 Role",
+            value=role.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="👮 Added By",
+            value=ctx.author.mention,
+            inline=False
+        )
+
+        embed.set_footer(text="ℳinstrea MM service")
+
+        await ctx.send(embed=embed)
+
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to give this role.")
+
+    except discord.HTTPException:
+        await ctx.send("❌ Discord rejected the role change.")
+
+
+@role_command.error
+async def role_command_error(ctx, error):
+
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.BotMissingPermissions):
+        await ctx.send("❌ I need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("❌ Usage: `$role @user @role`")
+
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Usage: `$role @user @role`")
+
+
+# ============================================================
+# $PROMO
+# Usage: $promo @user
+# Promotes by ONE role
+# ============================================================
+
+@bot.command(name="promo")
+@commands.has_permissions(manage_roles=True)
+@commands.bot_has_permissions(manage_roles=True)
+async def promo(ctx, member: discord.Member):
+
+    if member == ctx.author:
+        return await ctx.send("❌ You cannot promote yourself.")
+
+    if member == ctx.guild.owner:
+        return await ctx.send("❌ You cannot promote the server owner.")
+
+    if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send(
+            "❌ You cannot promote someone with an equal or higher role."
+        )
+
+    bot_role = ctx.guild.me.top_role
+
+    manageable_roles = [
+        role for role in ctx.guild.roles
+        if role != ctx.guild.default_role
+        and not role.managed
+        and role < bot_role
+    ]
+
+    manageable_roles.sort(key=lambda r: r.position)
+
+    current_role = member.top_role
+
+    next_roles = [
+        role for role in manageable_roles
+        if role.position > current_role.position
+    ]
+
+    if not next_roles:
+        return await ctx.send(
+            "❌ There is no higher role available to promote this user."
+        )
+
+    next_role = next_roles[0]
+
+    try:
+        await member.add_roles(
+            next_role,
+            reason=f"Promoted by {ctx.author}"
+        )
+
+        embed = discord.Embed(
+            title="⬆️ Member Promoted",
+            description=f"{member.mention} has been promoted by **one role**.",
+            color=discord.Color.green()
+        )
+
+        embed.add_field(
+            name="👤 User",
+            value=member.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="🎭 New Role",
+            value=next_role.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="👮 Promoted By",
+            value=ctx.author.mention,
+            inline=False
+        )
+
+        embed.set_footer(text="ℳinstrea MM service")
+
+        await ctx.send(embed=embed)
+
+    except discord.Forbidden:
+        await ctx.send(
+            "❌ I cannot give that role. Make sure my bot role is higher."
+        )
+
+    except discord.HTTPException:
+        await ctx.send("❌ Discord rejected the promotion.")
+
+
+@promo.error
+async def promo_error(ctx, error):
+
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.BotMissingPermissions):
+        await ctx.send("❌ I need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("❌ Usage: `$promo @user`")
+
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Please mention a valid member.")
+
+
+# ============================================================
+# $DEMO
+# Usage: $demo @user
+# Demotes by ONE role
+# ============================================================
+
+@bot.command(name="demo")
+@commands.has_permissions(manage_roles=True)
+@commands.bot_has_permissions(manage_roles=True)
+async def demo(ctx, member: discord.Member):
+
+    if member == ctx.author:
+        return await ctx.send("❌ You cannot demote yourself.")
+
+    if member == ctx.guild.owner:
+        return await ctx.send("❌ You cannot demote the server owner.")
+
+    if member.top_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+        return await ctx.send(
+            "❌ You cannot demote someone with an equal or higher role."
+        )
+
+    bot_role = ctx.guild.me.top_role
+
+    manageable_roles = [
+        role for role in ctx.guild.roles
+        if role != ctx.guild.default_role
+        and not role.managed
+        and role < bot_role
+    ]
+
+    manageable_roles.sort(key=lambda r: r.position)
+
+    current_role = member.top_role
+
+    previous_roles = [
+        role for role in manageable_roles
+        if role.position < current_role.position
+    ]
+
+    if not previous_roles:
+        return await ctx.send(
+            "❌ There is no lower role available to demote this user."
+        )
+
+    previous_role = previous_roles[-1]
+
+    try:
+        if current_role != ctx.guild.default_role:
+            await member.remove_roles(
+                current_role,
+                reason=f"Demoted by {ctx.author}"
+            )
+
+        if previous_role != ctx.guild.default_role:
+            await member.add_roles(
+                previous_role,
+                reason=f"Demoted by {ctx.author}"
+            )
+
+        embed = discord.Embed(
+            title="⬇️ Member Demoted",
+            description=f"{member.mention} has been demoted by **one role**.",
+            color=discord.Color.orange()
+        )
+
+        embed.add_field(
+            name="👤 User",
+            value=member.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="🎭 Previous Role",
+            value=current_role.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="🎭 New Role",
+            value=previous_role.mention,
+            inline=True
+        )
+
+        embed.add_field(
+            name="👮 Demoted By",
+            value=ctx.author.mention,
+            inline=False
+        )
+
+        embed.set_footer(text="ℳinstrea MM service")
+
+        await ctx.send(embed=embed)
+
+    except discord.Forbidden:
+        await ctx.send(
+            "❌ I cannot change that user's roles. Make sure my bot role is higher."
+        )
+
+    except discord.HTTPException:
+        await ctx.send("❌ Discord rejected the role change.")
+
+
+@demo.error
+async def demo_error(ctx, error):
+
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.BotMissingPermissions):
+        await ctx.send("❌ I need the **Manage Roles** permission.")
+
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("❌ Usage: `$demo @user`")
+
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Please mention a valid member.")
 
 
 # ============================================================
@@ -328,12 +607,8 @@ async def vouches_error(ctx, error):
 
 @bot.event
 async def on_ready():
-
     print(f"✅ Logged in as {bot.user}")
-    print(
-        f"✅ Bot is running in "
-        f"{len(bot.guilds)} server(s)"
-    )
+    print(f"✅ Bot is running in {len(bot.guilds)} server(s)")
 
 
 bot.run(TOKEN)
