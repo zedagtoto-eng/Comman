@@ -134,7 +134,6 @@ async def get_member(ctx, value):
 
 # ============================================================
 # MEMBER INPUT RESOLVER
-# Used by $add and $transferticket
 # ============================================================
 
 async def get_member_from_input(ctx, value):
@@ -144,22 +143,15 @@ async def get_member_from_input(ctx, value):
 
     value = str(value).strip()
 
-    # Mention
     match = re.fullmatch(r"<@!?(\d+)>", value)
 
     if match:
         user_id = int(match.group(1))
-
         return ctx.guild.get_member(user_id)
 
-    # User ID
     if value.isdigit():
+        return ctx.guild.get_member(int(value))
 
-        return ctx.guild.get_member(
-            int(value)
-        )
-
-    # Username / display name
     value_lower = value.lower()
 
     for member in ctx.guild.members:
@@ -174,6 +166,281 @@ async def get_member_from_input(ctx, value):
             return member
 
     return None
+
+
+# ============================================================
+# $DM @USER MESSAGE
+# ============================================================
+
+@bot.command(name="dm")
+@commands.has_permissions(administrator=True)
+async def dm_command(ctx, member: discord.Member, *, message: str):
+
+    if member.bot:
+
+        return await ctx.send(
+            "❌ You cannot DM a bot."
+        )
+
+    if not message.strip():
+
+        return await ctx.send(
+            "❌ Please provide a message.\n"
+            "Usage: `$dm @user message`"
+        )
+
+    try:
+
+        embed = discord.Embed(
+            title="📩 Direct Message",
+            description=message,
+            color=discord.Color.from_rgb(
+                255,
+                20,
+                180
+            )
+        )
+
+        embed.set_footer(
+            text=f"Sent from {ctx.guild.name}"
+        )
+
+        await member.send(embed=embed)
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            f"❌ I couldn't DM {member.mention}. "
+            "Their DMs may be disabled."
+        )
+
+    except discord.HTTPException:
+
+        return await ctx.send(
+            f"❌ Discord returned an error while "
+            f"DMing {member.mention}."
+        )
+
+    await ctx.send(
+        f"✅ DM sent to {member.mention}."
+    )
+
+
+@dm_command.error
+async def dm_command_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        return await ctx.send(
+            "❌ You need the **Administrator** permission "
+            "to use `$dm`."
+        )
+
+    if isinstance(
+        error,
+        commands.MissingRequiredArgument
+    ):
+
+        return await ctx.send(
+            "❌ Usage: `$dm @user message`"
+        )
+
+    if isinstance(
+        error,
+        commands.BadArgument
+    ):
+
+        return await ctx.send(
+            "❌ Please mention a valid server member."
+        )
+
+
+# ============================================================
+# $MASSDM MESSAGE
+# ============================================================
+
+@bot.command(name="massdm")
+@commands.has_permissions(administrator=True)
+async def massdm_command(ctx, *, message: str):
+
+    if not message.strip():
+
+        return await ctx.send(
+            "❌ Please provide a message.\n"
+            "Usage: `$massdm message`"
+        )
+
+    members = [
+        member
+        for member in ctx.guild.members
+        if not member.bot
+    ]
+
+    if not members:
+
+        return await ctx.send(
+            "❌ There are no members to DM."
+        )
+
+    # --------------------------------------------------------
+    # CONFIRM START
+    # --------------------------------------------------------
+
+    status_message = await ctx.send(
+        "📨 **Mass DM started.**\n"
+        f"👥 Members to DM: **{len(members)}**\n"
+        "⏳ Sending messages..."
+    )
+
+    sent = 0
+    failed = 0
+
+    embed = discord.Embed(
+        title="📩 Message from the Server",
+        description=message,
+        color=discord.Color.from_rgb(
+            255,
+            20,
+            180
+        )
+    )
+
+    embed.set_footer(
+        text=f"Sent from {ctx.guild.name}"
+    )
+
+    # --------------------------------------------------------
+    # SEND DMS
+    # --------------------------------------------------------
+
+    for member in members:
+
+        try:
+
+            await member.send(
+                embed=embed
+            )
+
+            sent += 1
+
+        except (
+            discord.Forbidden,
+            discord.NotFound,
+            discord.HTTPException
+        ):
+
+            failed += 1
+
+        except Exception as e:
+
+            failed += 1
+
+            print(
+                f"❌ Failed to DM {member} "
+                f"({member.id}): "
+                f"{type(e).__name__}: {e}"
+            )
+
+        # Small delay to reduce rate-limit problems
+        await asyncio.sleep(1)
+
+        # Update status every 10 members
+        if (sent + failed) % 10 == 0:
+
+            try:
+
+                await status_message.edit(
+                    content=(
+                        "📨 **Mass DM in progress...**\n"
+                        f"📤 Sent: **{sent}**\n"
+                        f"❌ Failed: **{failed}**\n"
+                        f"📊 Progress: "
+                        f"**{sent + failed}/{len(members)}**"
+                    )
+                )
+
+            except discord.HTTPException:
+                pass
+
+    # --------------------------------------------------------
+    # FINISHED
+    # --------------------------------------------------------
+
+    embed_result = discord.Embed(
+        title="📨 Mass DM Finished",
+        color=discord.Color.from_rgb(
+            255,
+            20,
+            180
+        )
+    )
+
+    embed_result.add_field(
+        name="📤 Successfully Sent",
+        value=f"**{sent}**",
+        inline=True
+    )
+
+    embed_result.add_field(
+        name="❌ Failed",
+        value=f"**{failed}**",
+        inline=True
+    )
+
+    embed_result.add_field(
+        name="👥 Total Members",
+        value=f"**{len(members)}**",
+        inline=True
+    )
+
+    embed_result.add_field(
+        name="👮 Started By",
+        value=ctx.author.mention,
+        inline=False
+    )
+
+    embed_result.set_footer(
+        text=f"Mass DM • {ctx.guild.name}"
+    )
+
+    try:
+
+        await status_message.edit(
+            content=None,
+            embed=embed_result
+        )
+
+    except discord.HTTPException:
+
+        await ctx.send(
+            embed=embed_result
+        )
+
+
+@massdm_command.error
+async def massdm_command_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        return await ctx.send(
+            "❌ You need the **Administrator** permission "
+            "to use `$massdm`."
+        )
+
+    if isinstance(
+        error,
+        commands.MissingRequiredArgument
+    ):
+
+        return await ctx.send(
+            "❌ Usage: `$massdm message`"
+        )
 
 
 # ============================================================
@@ -906,11 +1173,6 @@ async def profile_error(ctx, error):
 # ============================================================
 # $FILL
 # ============================================================
-# Usage:
-# $fill
-#
-# Fills missing roles for YOURSELF.
-# ============================================================
 
 @bot.command(name="fill")
 @commands.has_permissions(manage_roles=True)
@@ -920,19 +1182,11 @@ async def fill(ctx):
     bot_member = ctx.guild.me
     bot_top = bot_member.top_role
 
-    # --------------------------------------------------------
-    # CHECK BOT MANAGE ROLES
-    # --------------------------------------------------------
-
     if not bot_member.guild_permissions.manage_roles:
 
         return await ctx.send(
             "❌ I need the **Manage Roles** permission."
         )
-
-    # --------------------------------------------------------
-    # CHECK USER HAS A ROLE
-    # --------------------------------------------------------
 
     if member.top_role == ctx.guild.default_role:
 
@@ -940,43 +1194,29 @@ async def fill(ctx):
             "❌ You have no role to fill below."
         )
 
-    # --------------------------------------------------------
-    # FIND ONLY ASSIGNABLE ROLES
-    # --------------------------------------------------------
-
     roles_to_add = []
 
     for role in ctx.guild.roles:
 
-        # @everyone
         if role == ctx.guild.default_role:
             continue
 
-        # Discord-managed/integration role
         if role.managed:
             continue
 
-        # Role must be below bot
         if role.position >= bot_top.position:
             continue
 
-        # Role must be below user's highest role
         if role.position >= member.top_role.position:
             continue
 
-        # Already has role
         if role in member.roles:
             continue
 
-        # Discord.py confirms bot can assign it
         if not role.is_assignable():
             continue
 
         roles_to_add.append(role)
-
-    # --------------------------------------------------------
-    # NOTHING TO FILL
-    # --------------------------------------------------------
 
     if not roles_to_add:
 
@@ -985,14 +1225,9 @@ async def fill(ctx):
             "below your highest role."
         )
 
-    # Lowest roles first
     roles_to_add.sort(
         key=lambda role: role.position
     )
-
-    # --------------------------------------------------------
-    # ADD ROLES
-    # --------------------------------------------------------
 
     try:
 
@@ -1001,11 +1236,7 @@ async def fill(ctx):
             reason=f"Fill roles by {ctx.author}"
         )
 
-    except discord.Forbidden as e:
-
-        print(
-            f"❌ $fill Forbidden error: {e}"
-        )
+    except discord.Forbidden:
 
         return await ctx.send(
             "❌ Discord refused the role update. "
@@ -1013,30 +1244,11 @@ async def fill(ctx):
             "role is above the roles being filled."
         )
 
-    except discord.HTTPException as e:
-
-        print(
-            f"❌ $fill HTTP error: {e}"
-        )
+    except discord.HTTPException:
 
         return await ctx.send(
             "❌ Discord returned an error while giving the roles."
         )
-
-    except Exception as e:
-
-        print(
-            f"❌ $fill unexpected error: "
-            f"{type(e).__name__}: {e}"
-        )
-
-        return await ctx.send(
-            f"❌ `$fill` failed: `{type(e).__name__}`"
-        )
-
-    # --------------------------------------------------------
-    # SUCCESS
-    # --------------------------------------------------------
 
     await ctx.send(
         f"✅ Filled **{len(roles_to_add)}** missing role(s) "
@@ -1071,15 +1283,6 @@ async def fill_error(ctx, error):
             f"❌ `$fill` failed: "
             f"`{type(error.original).__name__}`"
         )
-
-    print(
-        f"❌ $fill error: "
-        f"{type(error).__name__}: {error}"
-    )
-
-    await ctx.send(
-        "❌ An error occurred while running `$fill`."
-    )
 
 
 # ============================================================
@@ -1268,10 +1471,6 @@ async def temp(ctx):
             "❌ You are already temporarily demoted."
         )
 
-    # --------------------------------------------------------
-    # SAVE ALL CURRENT ROLES
-    # --------------------------------------------------------
-
     current_roles = [
         role.id
         for role in member.roles
@@ -1281,10 +1480,6 @@ async def temp(ctx):
     temp_data[user_id] = current_roles
 
     save_temp_data(temp_data)
-
-    # --------------------------------------------------------
-    # REMOVE ROLES EXCEPT THE TWO PROTECTED ROLES
-    # --------------------------------------------------------
 
     roles_to_remove = [
         role
@@ -2417,23 +2612,6 @@ async def transferticket(
     await ctx.send(embed=embed)
 
 
-@transferticket.error
-async def transferticket_error(
-    ctx,
-    error
-):
-
-    if isinstance(
-        error,
-        commands.MissingRequiredArgument
-    ):
-
-        await ctx.send(
-            "❌ Usage: `$transferticket @user` or "
-            "`$transferticket userID`"
-        )
-
-
 # ============================================================
 # $ADD @USER OR USER ID
 # ============================================================
@@ -2524,31 +2702,6 @@ async def add_user(
     await ctx.send(embed=embed)
 
 
-@add_user.error
-async def add_user_error(
-    ctx,
-    error
-):
-
-    if isinstance(
-        error,
-        commands.MissingRequiredArgument
-    ):
-
-        await ctx.send(
-            "❌ Usage: `$add @user` or `$add userID`"
-        )
-
-    elif isinstance(
-        error,
-        commands.MissingPermissions
-    ):
-
-        await ctx.send(
-            "❌ You need the **Manage Channels** permission."
-        )
-
-
 # ============================================================
 # $TRANSFERROLES @USER
 # ============================================================
@@ -2633,10 +2786,6 @@ async def backup_command(ctx):
         "channels": []
     }
 
-    # --------------------------------------------------------
-    # ROLES
-    # --------------------------------------------------------
-
     for role in guild.roles:
 
         if role == guild.default_role:
@@ -2650,20 +2799,12 @@ async def backup_command(ctx):
             "mentionable": role.mentionable
         })
 
-    # --------------------------------------------------------
-    # CATEGORIES
-    # --------------------------------------------------------
-
     for category in guild.categories:
 
         backup["categories"].append({
             "name": category.name,
             "position": category.position
         })
-
-    # --------------------------------------------------------
-    # CHANNELS
-    # --------------------------------------------------------
 
     for channel in guild.channels:
 
@@ -2761,10 +2902,6 @@ async def restore_command(ctx):
         "from the saved backup."
     )
 
-    # --------------------------------------------------------
-    # RESTORE ROLES
-    # --------------------------------------------------------
-
     existing_roles = {
         role.name: role
         for role in ctx.guild.roles
@@ -2804,10 +2941,6 @@ async def restore_command(ctx):
         except discord.Forbidden:
             pass
 
-    # --------------------------------------------------------
-    # RESTORE CATEGORIES
-    # --------------------------------------------------------
-
     existing_categories = {
         category.name: category
         for category in ctx.guild.categories
@@ -2838,10 +2971,6 @@ async def restore_command(ctx):
 
         except discord.Forbidden:
             pass
-
-    # --------------------------------------------------------
-    # RESTORE CHANNELS
-    # --------------------------------------------------------
 
     existing_channels = {
         channel.name
@@ -2949,6 +3078,15 @@ async def help_command(ctx):
             20,
             180
         )
+    )
+
+    embed.add_field(
+        name="📩 DM Commands",
+        value=(
+            "`$dm @user message` — DM one user\n"
+            "`$massdm message` — DM server members"
+        ),
+        inline=False
     )
 
     embed.add_field(
