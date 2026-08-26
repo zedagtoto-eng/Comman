@@ -6,6 +6,7 @@ import os
 import json
 import re
 import asyncio
+import datetime
 import discord
 from discord.ext import commands
 
@@ -40,6 +41,7 @@ bot = commands.Bot(
 
 VOUCH_FILE = "vouches.json"
 TEMP_FILE = "temp_roles.json"
+BACKUP_FILE = "server_backup.json"
 
 
 # ============================================================
@@ -47,16 +49,6 @@ TEMP_FILE = "temp_roles.json"
 # ============================================================
 
 TICKET_CATEGORY_ID = 1541096510102437911
-
-
-# ============================================================
-# TEMP ROLE SETTINGS
-# ============================================================
-
-TEMP_KEEP_ROLE_IDS = [
-    1541096480146853968,
-    1541096476610928730
-]
 
 
 # ============================================================
@@ -79,12 +71,10 @@ def load_vouches():
         return {}
 
     try:
-
         with open(VOUCH_FILE, "r") as f:
             return json.load(f)
 
     except (json.JSONDecodeError, OSError):
-
         return {}
 
 
@@ -104,12 +94,10 @@ def load_temp_data():
         return {}
 
     try:
-
         with open(TEMP_FILE, "r") as f:
             return json.load(f)
 
     except (json.JSONDecodeError, OSError):
-
         return {}
 
 
@@ -134,12 +122,48 @@ async def get_member(ctx, value):
 
     if match:
         user_id = int(match.group(1))
+
     elif value.isdigit():
         user_id = int(value)
+
     else:
         return None
 
     return ctx.guild.get_member(user_id)
+
+
+# ============================================================
+# MEMBER INPUT RESOLVER
+# Supports:
+# @mention
+# User ID
+# ============================================================
+
+async def get_member_from_input(ctx, value):
+
+    if not ctx.guild:
+        return None
+
+    value = str(value).strip()
+
+    match = re.fullmatch(
+        r"<@!?(\d+)>",
+        value
+    )
+
+    if match:
+
+        user_id = int(match.group(1))
+
+        return ctx.guild.get_member(user_id)
+
+    if value.isdigit():
+
+        return ctx.guild.get_member(
+            int(value)
+        )
+
+    return None
 
 
 # ============================================================
@@ -381,10 +405,18 @@ async def role_command(ctx, member: discord.Member, role: discord.Role):
             f"❌ {member.mention} already has {role.mention}."
         )
 
-    await member.add_roles(
-        role,
-        reason=f"Role command used by {ctx.author}"
-    )
+    try:
+
+        await member.add_roles(
+            role,
+            reason=f"Role command used by {ctx.author}"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I don't have permission to give that role."
+        )
 
     await ctx.send(
         f"✅ Added {role.mention} to {member.mention}."
@@ -765,21 +797,45 @@ async def profile_error(ctx, error):
 
 
 # ============================================================
-# $FILL @USER
+# $FILL
+#
+# Usage:
+# $fill
+#
+# Fills missing roles for the person using the command.
 # ============================================================
 
 @bot.command(name="fill")
 @commands.has_permissions(manage_roles=True)
-async def fill(ctx, member: discord.Member):
+async def fill(ctx):
+
+    # --------------------------------------------------------
+    # TARGET = COMMAND USER
+    # --------------------------------------------------------
+
+    member = ctx.author
+
+    # --------------------------------------------------------
+    # GET BOT HIGHEST ROLE
+    # --------------------------------------------------------
 
     bot_top = ctx.guild.me.top_role
+
     highest_member_role = member.top_role
+
+    # --------------------------------------------------------
+    # CHECK IF USER HAS A ROLE
+    # --------------------------------------------------------
 
     if highest_member_role == ctx.guild.default_role:
 
         return await ctx.send(
             f"❌ {member.mention} has no role to fill below."
         )
+
+    # --------------------------------------------------------
+    # FIND MISSING ROLES
+    # --------------------------------------------------------
 
     roles_to_add = [
         role
@@ -790,12 +846,20 @@ async def fill(ctx, member: discord.Member):
         and role not in member.roles
     ]
 
+    # --------------------------------------------------------
+    # NO MISSING ROLES
+    # --------------------------------------------------------
+
     if not roles_to_add:
 
         return await ctx.send(
             f"❌ There are no missing manageable roles below "
             f"{member.mention}'s highest role."
         )
+
+    # --------------------------------------------------------
+    # USER CAN ONLY MANAGE ROLES BELOW THEIR HIGHEST ROLE
+    # --------------------------------------------------------
 
     if ctx.author != ctx.guild.owner:
 
@@ -808,17 +872,59 @@ async def fill(ctx, member: discord.Member):
     if not roles_to_add:
 
         return await ctx.send(
-            "❌ You cannot manage the roles below this user's highest role."
+            "❌ You cannot manage the roles below your "
+            "highest role."
         )
 
-    await member.add_roles(
-        *roles_to_add,
-        reason=f"Fill roles by {ctx.author}"
-    )
+    # --------------------------------------------------------
+    # ADD ROLES
+    # --------------------------------------------------------
+
+    try:
+
+        await member.add_roles(
+            *roles_to_add,
+            reason=f"Fill roles by {ctx.author}"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I don't have permission to give one or more "
+            "of these roles. Make sure my bot role is above "
+            "the roles being filled."
+        )
+
+    except discord.HTTPException as e:
+
+        print(
+            f"❌ Discord API error in $fill: {e}"
+        )
+
+        return await ctx.send(
+            "❌ Discord returned an error while trying "
+            "to add the roles."
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Unexpected error in $fill: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return await ctx.send(
+            "❌ An unexpected error occurred while filling "
+            "your roles."
+        )
+
+    # --------------------------------------------------------
+    # SUCCESS
+    # --------------------------------------------------------
 
     await ctx.send(
-        f"✅ Filled **{len(roles_to_add)}** roles below "
-        f"{member.mention}'s highest role."
+        f"✅ Filled **{len(roles_to_add)}** missing role(s) "
+        f"for {member.mention}."
     )
 
 
@@ -827,21 +933,28 @@ async def fill_error(ctx, error):
 
     if isinstance(error, commands.MissingPermissions):
 
-        await ctx.send(
-            "❌ You need the **Manage Roles** permission."
+        return await ctx.send(
+            "❌ You need the **Manage Roles** permission "
+            "to use `$fill`."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
+    if isinstance(error, commands.CommandInvokeError):
 
-        await ctx.send(
-            "❌ Usage: `$fill @user`"
+        print(
+            f"❌ $fill error: "
+            f"{type(error.original).__name__}: "
+            f"{error.original}"
         )
 
-    elif isinstance(error, commands.BadArgument):
-
-        await ctx.send(
-            "❌ Please mention a valid member."
+        return await ctx.send(
+            "❌ An error occurred while running `$fill`. "
+            "Check the bot console for the exact error."
         )
+
+    print(
+        f"❌ $fill error: "
+        f"{type(error).__name__}: {error}"
+    )
 
 
 # ============================================================
@@ -1257,17 +1370,6 @@ async def canceltemp(ctx):
 
 # ============================================================
 # $TO @USER TIME
-# Supports:
-# s = seconds
-# m = minutes
-# h = hours
-# d = days
-#
-# Examples:
-# $to @user 10m
-# $to @user 1h
-# $to @user 30s
-# $to @user 2d
 # ============================================================
 
 @bot.command(name="to")
@@ -1329,15 +1431,6 @@ async def timeout_command(ctx, member: discord.Member, duration: str):
         )
 
     try:
-
-        await member.timeout(
-            discord.utils.utcnow() + discord.timedelta(seconds=seconds),
-            reason=f"Timeout by {ctx.author}"
-        )
-
-    except AttributeError:
-
-        import datetime
 
         await member.timeout(
             datetime.timedelta(seconds=seconds),
@@ -1417,7 +1510,13 @@ async def ban_command(ctx, target):
 
         try:
             user = await bot.fetch_user(int(target))
-        except (ValueError, discord.NotFound, discord.HTTPException):
+
+        except (
+            ValueError,
+            discord.NotFound,
+            discord.HTTPException
+        ):
+
             return await ctx.send(
                 "❌ Please provide a valid user mention or ID."
             )
@@ -1593,6 +1692,7 @@ async def purge_command(ctx, amount: int):
 
     try:
         await message.delete()
+
     except discord.NotFound:
         pass
 
@@ -1691,18 +1791,10 @@ async def claim(ctx):
             "❌ I need **Manage Channels** permission."
         )
 
-    # --------------------------------------------------------
-    # FIND MIDDLEMAN ROLE
-    # --------------------------------------------------------
-
     middleman_role = discord.utils.find(
         lambda role: role.name.lower() == "middleman",
         ctx.guild.roles
     )
-
-    # --------------------------------------------------------
-    # HIDE FROM MIDDLEMEN
-    # --------------------------------------------------------
 
     if middleman_role:
 
@@ -1716,10 +1808,6 @@ async def claim(ctx):
 
         except discord.Forbidden:
             pass
-
-    # --------------------------------------------------------
-    # GIVE CLAIMER ACCESS
-    # --------------------------------------------------------
 
     try:
 
@@ -1890,10 +1978,7 @@ async def unclaim(ctx):
 
 @bot.command(name="transferticket")
 @commands.has_permissions(manage_channels=True)
-async def transferticket(
-    ctx,
-    user_input: str
-):
+async def transferticket(ctx, user_input: str):
 
     if not is_ticket_channel(ctx.channel):
 
@@ -1973,14 +2058,7 @@ async def transferticket(
             "❌ I need **Manage Channels** permission."
         )
 
-    # --------------------------------------------------------
-    # REMOVE OLD CLAIMER
-    # --------------------------------------------------------
-
-    if (
-        claimed_id
-        and claimed_id != member.id
-    ):
+    if claimed_id and claimed_id != member.id:
 
         old_claimer = ctx.guild.get_member(
             claimed_id
@@ -1999,10 +2077,6 @@ async def transferticket(
             except discord.Forbidden:
                 pass
 
-    # --------------------------------------------------------
-    # HIDE FROM MIDDLEMEN
-    # --------------------------------------------------------
-
     middleman_role = discord.utils.find(
         lambda role: role.name.lower() == "middleman",
         ctx.guild.roles
@@ -2020,10 +2094,6 @@ async def transferticket(
 
         except discord.Forbidden:
             pass
-
-    # --------------------------------------------------------
-    # GIVE NEW MEMBER ACCESS
-    # --------------------------------------------------------
 
     try:
 
@@ -2085,10 +2155,7 @@ async def transferticket_error(ctx, error):
 
 @bot.command(name="add")
 @commands.has_permissions(manage_channels=True)
-async def add_user(
-    ctx,
-    user_input: str
-):
+async def add_user(ctx, user_input: str):
 
     if not is_ticket_channel(ctx.channel):
 
@@ -2245,15 +2312,9 @@ async def transferroles(ctx, target):
     )
 
 
-
-
-
 # ============================================================
 # $BACKUP
 # ============================================================
-
-BACKUP_FILE = "server_backup.json"
-
 
 @bot.command(name="backup")
 @commands.has_permissions(administrator=True)
@@ -2268,10 +2329,6 @@ async def backup_command(ctx):
         "channels": []
     }
 
-    # --------------------------------------------------------
-    # ROLES
-    # --------------------------------------------------------
-
     for role in guild.roles:
 
         if role == guild.default_role:
@@ -2285,10 +2342,6 @@ async def backup_command(ctx):
             "mentionable": role.mentionable
         })
 
-    # --------------------------------------------------------
-    # CATEGORIES
-    # --------------------------------------------------------
-
     for category in guild.categories:
 
         backup["categories"].append({
@@ -2296,14 +2349,9 @@ async def backup_command(ctx):
             "position": category.position
         })
 
-    # --------------------------------------------------------
-    # CHANNELS
-    # --------------------------------------------------------
-
     for channel in guild.channels:
 
         if isinstance(channel, discord.CategoryChannel):
-
             continue
 
         data = {
@@ -2359,7 +2407,6 @@ async def restore_command(ctx):
     try:
 
         with open(BACKUP_FILE, "r") as f:
-
             backup = json.load(f)
 
     except (json.JSONDecodeError, OSError):
@@ -2373,10 +2420,6 @@ async def restore_command(ctx):
         "This will recreate missing roles and channels from "
         "the saved backup."
     )
-
-    # --------------------------------------------------------
-    # RESTORE ROLES
-    # --------------------------------------------------------
 
     existing_roles = {
         role.name: role
@@ -2408,12 +2451,7 @@ async def restore_command(ctx):
             created_roles += 1
 
         except discord.Forbidden:
-
             pass
-
-    # --------------------------------------------------------
-    # RESTORE CATEGORIES
-    # --------------------------------------------------------
 
     existing_categories = {
         category.name: category
@@ -2438,12 +2476,7 @@ async def restore_command(ctx):
             created_categories += 1
 
         except discord.Forbidden:
-
             pass
-
-    # --------------------------------------------------------
-    # RESTORE CHANNELS
-    # --------------------------------------------------------
 
     existing_channels = {
         channel.name
@@ -2507,8 +2540,10 @@ async def restore_command(ctx):
 
                 created_channels += 1
 
-        except (discord.Forbidden, discord.HTTPException):
-
+        except (
+            discord.Forbidden,
+            discord.HTTPException
+        ):
             pass
 
     await ctx.send(
@@ -2555,7 +2590,7 @@ async def help_command(ctx):
             "`$role @user @role` — Give a role\n"
             "`$promo @user` — Promote a user\n"
             "`$demo @user` — Demote a user\n"
-            "`$fill @user` — Fill missing roles\n"
+            "`$fill` — Fill your missing roles\n"
             "`$roles` — Show server roles"
         ),
         inline=False
@@ -2613,13 +2648,11 @@ async def help_command(ctx):
         inline=False
     )
 
-    embed.set_thumbnail(
-        url=(
-            ctx.guild.icon.url
-            if ctx.guild and ctx.guild.icon
-            else discord.Embed.Empty
+    if ctx.guild and ctx.guild.icon:
+
+        embed.set_thumbnail(
+            url=ctx.guild.icon.url
         )
-    )
 
     embed.set_footer(
         text=f"Requested by {ctx.author.display_name}"
@@ -2661,15 +2694,25 @@ async def on_command_error(ctx, error):
         original = error.original
 
         print(
-            f"❌ Error in command `{ctx.command}`: {original}"
+            f"❌ Error in command `{ctx.command}`:"
+        )
+
+        print(
+            f"   Type: {type(original).__name__}"
+        )
+
+        print(
+            f"   Error: {original}"
         )
 
         return await ctx.send(
-            "❌ An error occurred while running this command."
+            "❌ An error occurred while running this command.\n"
+            f"**Error:** `{type(original).__name__}`"
         )
 
     print(
-        f"❌ Unhandled command error: {error}"
+        f"❌ Unhandled command error: "
+        f"{type(error).__name__}: {error}"
     )
 
 
