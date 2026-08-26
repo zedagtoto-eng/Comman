@@ -1,5 +1,5 @@
 # ============================================================
-# IMPORTS / TOKEN
+# IMPORTS
 # ============================================================
 
 import os
@@ -7,10 +7,29 @@ import json
 import discord
 from discord.ext import commands
 
+
+# ============================================================
+# TOKEN
+# ============================================================
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
     raise RuntimeError("DISCORD_TOKEN is not set")
+
+
+# ============================================================
+# BOT
+# ============================================================
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True
+
+bot = commands.Bot(
+    command_prefix="$",
+    intents=intents
+)
 
 
 # ============================================================
@@ -50,10 +69,7 @@ async def addvouch(ctx, member: discord.Member):
     vouches = load_vouches()
     user_id = str(member.id)
 
-    if user_id not in vouches:
-        vouches[user_id] = 0
-
-    vouches[user_id] += 1
+    vouches[user_id] = vouches.get(user_id, 0) + 1
     save_vouches(vouches)
 
     embed = discord.Embed(
