@@ -4,8 +4,6 @@
 
 import os
 import json
-import re
-import asyncio
 import discord
 from discord.ext import commands
 
@@ -40,6 +38,13 @@ bot = commands.Bot(
 
 VOUCH_FILE = "vouches.json"
 TEMP_FILE = "temp_roles.json"
+
+
+# ============================================================
+# TICKET SETTINGS
+# ============================================================
+
+TICKET_CATEGORY_ID = 1541096510102437911
 
 
 # ============================================================
@@ -103,26 +108,42 @@ def save_temp_data(data):
 
 
 # ============================================================
-# MEMBER RESOLVER
+# TICKET CHECK
 # ============================================================
 
-async def get_member(ctx, value):
+def is_ticket_channel(channel):
 
-    if isinstance(value, discord.Member):
-        return value
+    return (
+        channel.category is not None
+        and channel.category.id == 1541096510102437911
+    )
 
-    value = str(value).strip()
 
-    match = re.fullmatch(r"<@!?(\d+)>", value)
+# ============================================================
+# GET MEMBER FROM MENTION OR USER ID
+# ============================================================
 
-    if match:
-        user_id = int(match.group(1))
-    elif value.isdigit():
-        user_id = int(value)
-    else:
+async def get_member_from_input(ctx, user_input):
+
+    try:
+
+        return await commands.MemberConverter().convert(
+            ctx,
+            user_input
+        )
+
+    except commands.BadArgument:
+        pass
+
+    try:
+
+        user_id = int(user_input)
+
+        return ctx.guild.get_member(user_id)
+
+    except (ValueError, TypeError):
+
         return None
-
-    return ctx.guild.get_member(user_id)
 
 
 # ============================================================
@@ -134,16 +155,19 @@ async def get_member(ctx, value):
 async def addvouch(ctx, member: discord.Member, amount: int = 1):
 
     if member.bot:
+
         return await ctx.send(
             "❌ You cannot add a vouch to a bot."
         )
 
     if amount <= 0:
+
         return await ctx.send(
             "❌ The number must be greater than 0."
         )
 
     vouches = load_vouches()
+
     user_id = str(member.id)
 
     vouches[user_id] = vouches.get(user_id, 0) + amount
@@ -152,7 +176,10 @@ async def addvouch(ctx, member: discord.Member, amount: int = 1):
 
     embed = discord.Embed(
         title="⭐ Vouch Added",
-        description=f"Added **{amount}** vouch(s) to {member.mention}.",
+        description=(
+            f"Added **{amount}** vouch(s) to "
+            f"{member.mention}."
+        ),
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
@@ -194,13 +221,13 @@ async def addvouch_error(ctx, error):
             "❌ You need the **Manage Messages** permission."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
-
-        await ctx.send(
-            "❌ Usage: `$addvouch @user (number)`"
+    elif isinstance(
+        error,
+        (
+            commands.MissingRequiredArgument,
+            commands.BadArgument
         )
-
-    elif isinstance(error, commands.BadArgument):
+    ):
 
         await ctx.send(
             "❌ Usage: `$addvouch @user (number)`"
@@ -213,24 +240,34 @@ async def addvouch_error(ctx, error):
 
 @bot.command(name="removevouch")
 @commands.has_permissions(manage_messages=True)
-async def removevouch(ctx, member: discord.Member, amount: int = 1):
+async def removevouch(
+    ctx,
+    member: discord.Member,
+    amount: int = 1
+):
 
     if amount <= 0:
+
         return await ctx.send(
             "❌ The number must be greater than 0."
         )
 
     vouches = load_vouches()
+
     user_id = str(member.id)
 
     current = vouches.get(user_id, 0)
 
     if current <= 0:
+
         return await ctx.send(
             f"❌ {member.mention} has no vouches."
         )
 
-    new_total = max(0, current - amount)
+    new_total = max(
+        0,
+        current - amount
+    )
 
     vouches[user_id] = new_total
 
@@ -238,7 +275,10 @@ async def removevouch(ctx, member: discord.Member, amount: int = 1):
 
     embed = discord.Embed(
         title="🗑️ Vouch Removed",
-        description=f"Removed **{amount}** vouch(s) from {member.mention}.",
+        description=(
+            f"Removed **{amount}** vouch(s) from "
+            f"{member.mention}."
+        ),
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
@@ -276,13 +316,13 @@ async def removevouch_error(ctx, error):
             "❌ You need the **Manage Messages** permission."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
-
-        await ctx.send(
-            "❌ Usage: `$removevouch @user (number)`"
+    elif isinstance(
+        error,
+        (
+            commands.MissingRequiredArgument,
+            commands.BadArgument
         )
-
-    elif isinstance(error, commands.BadArgument):
+    ):
 
         await ctx.send(
             "❌ Usage: `$removevouch @user (number)`"
@@ -294,13 +334,20 @@ async def removevouch_error(ctx, error):
 # ============================================================
 
 @bot.command(name="vouches")
-async def vouches_command(ctx, member: discord.Member = None):
+async def vouches_command(
+    ctx,
+    member: discord.Member = None
+):
 
     if member is None:
         member = ctx.author
 
     vouches = load_vouches()
-    count = vouches.get(str(member.id), 0)
+
+    count = vouches.get(
+        str(member.id),
+        0
+    )
 
     embed = discord.Embed(
         title="⭐ Vouches",
@@ -336,7 +383,11 @@ async def vouches_command(ctx, member: discord.Member = None):
 
 @bot.command(name="role")
 @commands.has_permissions(manage_roles=True)
-async def role_command(ctx, member: discord.Member, role: discord.Role):
+async def role_command(
+    ctx,
+    member: discord.Member,
+    role: discord.Role
+):
 
     if role == ctx.guild.default_role:
 
@@ -347,15 +398,18 @@ async def role_command(ctx, member: discord.Member, role: discord.Role):
     if role >= ctx.guild.me.top_role:
 
         return await ctx.send(
-            "❌ I cannot give that role because it is equal to or "
-            "higher than my highest role."
+            "❌ I cannot give that role because it is equal "
+            "to or higher than my highest role."
         )
 
-    if role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+    if (
+        role >= ctx.author.top_role
+        and ctx.author != ctx.guild.owner
+    ):
 
         return await ctx.send(
-            "❌ You cannot manage a role equal to or higher than "
-            "your highest role."
+            "❌ You cannot manage a role equal to or higher "
+            "than your highest role."
         )
 
     if role in member.roles:
@@ -383,13 +437,13 @@ async def role_error(ctx, error):
             "❌ You need the **Manage Roles** permission."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
-
-        await ctx.send(
-            "❌ Usage: `$role @user @role`"
+    elif isinstance(
+        error,
+        (
+            commands.MissingRequiredArgument,
+            commands.BadArgument
         )
-
-    elif isinstance(error, commands.BadArgument):
+    ):
 
         await ctx.send(
             "❌ Usage: `$role @user @role`"
@@ -415,8 +469,10 @@ async def promo(ctx, member: discord.Member):
     manageable_roles = [
         role
         for role in ctx.guild.roles
-        if role != ctx.guild.default_role
-        and role < bot_top
+        if (
+            role != ctx.guild.default_role
+            and role < bot_top
+        )
     ]
 
     manageable_roles.sort(
@@ -465,11 +521,14 @@ async def promo(ctx, member: discord.Member):
             f"❌ {member.mention} cannot be promoted any further."
         )
 
-    if next_role >= ctx.author.top_role and ctx.author != ctx.guild.owner:
+    if (
+        next_role >= ctx.author.top_role
+        and ctx.author != ctx.guild.owner
+    ):
 
         return await ctx.send(
-            "❌ You cannot promote someone to a role equal to or "
-            "higher than your highest role."
+            "❌ You cannot promote someone to a role equal "
+            "to or higher than your highest role."
         )
 
     remove_roles = [
@@ -491,7 +550,8 @@ async def promo(ctx, member: discord.Member):
     )
 
     await ctx.send(
-        f"⬆️ {member.mention} has been promoted to {next_role.mention}."
+        f"⬆️ {member.mention} has been promoted to "
+        f"{next_role.mention}."
     )
 
 
@@ -536,8 +596,10 @@ async def demo(ctx, member: discord.Member):
     manageable_roles = [
         role
         for role in ctx.guild.roles
-        if role != ctx.guild.default_role
-        and role < bot_top
+        if (
+            role != ctx.guild.default_role
+            and role < bot_top
+        )
     ]
 
     manageable_roles.sort(
@@ -553,7 +615,8 @@ async def demo(ctx, member: discord.Member):
     if not current_manageable:
 
         return await ctx.send(
-            f"❌ {member.mention} has no manageable role to demote."
+            f"❌ {member.mention} has no manageable role "
+            f"to demote."
         )
 
     highest_current = max(
@@ -633,7 +696,10 @@ async def demo_error(ctx, error):
 # ============================================================
 
 @bot.command(name="w")
-async def profile(ctx, member: discord.Member = None):
+async def profile(
+    ctx,
+    member: discord.Member = None
+):
 
     if member is None:
         member = ctx.author
@@ -689,9 +755,11 @@ async def profile(ctx, member: discord.Member = None):
 
     embed.add_field(
         name=f"🎭 Roles [{len(roles)}]",
-        value=", ".join(roles)
-        if roles
-        else "No roles",
+        value=(
+            ", ".join(roles)
+            if roles
+            else "No roles"
+        ),
         inline=False
     )
 
@@ -715,14 +783,23 @@ async def profile(ctx, member: discord.Member = None):
 
     for attribute, display_name in permission_map.items():
 
-        if getattr(permissions, attribute, False):
-            permission_names.append(display_name)
+        if getattr(
+            permissions,
+            attribute,
+            False
+        ):
+
+            permission_names.append(
+                display_name
+            )
 
     embed.add_field(
         name="🔐 Role Permissions",
-        value=", ".join(permission_names)
-        if permission_names
-        else "No special permissions",
+        value=(
+            ", ".join(permission_names)
+            if permission_names
+            else "No special permissions"
+        ),
         inline=False
     )
 
@@ -748,14 +825,23 @@ async def profile_error(ctx, error):
 
 
 # ============================================================
-# $FILL @USER
+# $FILL
+# ============================================================
+# Fills the roles of the person who runs the command.
+# No @user is required.
+#
+# Usage:
+# $fill
 # ============================================================
 
 @bot.command(name="fill")
 @commands.has_permissions(manage_roles=True)
-async def fill(ctx, member: discord.Member):
+async def fill(ctx):
+
+    member = ctx.author
 
     bot_top = ctx.guild.me.top_role
+
     highest_member_role = member.top_role
 
     if highest_member_role == ctx.guild.default_role:
@@ -767,18 +853,13 @@ async def fill(ctx, member: discord.Member):
     roles_to_add = [
         role
         for role in ctx.guild.roles
-        if role != ctx.guild.default_role
-        and role.position < highest_member_role.position
-        and role < bot_top
-        and role not in member.roles
-    ]
-
-    if not roles_to_add:
-
-        return await ctx.send(
-            f"❌ There are no missing manageable roles below "
-            f"{member.mention}'s highest role."
+        if (
+            role != ctx.guild.default_role
+            and role.position < highest_member_role.position
+            and role < bot_top
+            and role not in member.roles
         )
+    ]
 
     if ctx.author != ctx.guild.owner:
 
@@ -791,17 +872,27 @@ async def fill(ctx, member: discord.Member):
     if not roles_to_add:
 
         return await ctx.send(
-            "❌ You cannot manage the roles below this user's highest role."
+            "❌ There are no missing manageable roles "
+            "below your highest role."
         )
 
-    await member.add_roles(
-        *roles_to_add,
-        reason=f"Fill roles by {ctx.author}"
-    )
+    try:
+
+        await member.add_roles(
+            *roles_to_add,
+            reason=f"Fill roles by {ctx.author}"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I don't have permission to add one or more "
+            "of these roles. Make sure my bot role is above them."
+        )
 
     await ctx.send(
         f"✅ Filled **{len(roles_to_add)}** roles below "
-        f"{member.mention}'s highest role."
+        f"your highest role."
     )
 
 
@@ -814,18 +905,6 @@ async def fill_error(ctx, error):
             "❌ You need the **Manage Roles** permission."
         )
 
-    elif isinstance(error, commands.MissingRequiredArgument):
-
-        await ctx.send(
-            "❌ Usage: `$fill @user`"
-        )
-
-    elif isinstance(error, commands.BadArgument):
-
-        await ctx.send(
-            "❌ Please mention a valid member."
-        )
-
 
 # ============================================================
 # $ROLES
@@ -834,7 +913,10 @@ async def fill_error(ctx, error):
 @bot.command(name="roles")
 async def roles_command(ctx):
 
-    roles = list(reversed(ctx.guild.roles))
+    roles = list(
+        reversed(ctx.guild.roles)
+    )
+
     role_lines = []
 
     for role in roles:
@@ -853,6 +935,7 @@ async def roles_command(ctx):
         )
 
     chunks = []
+
     current = ""
 
     for line in role_lines:
@@ -860,6 +943,7 @@ async def roles_command(ctx):
         if len(current) + len(line) + 1 > 4000:
 
             chunks.append(current)
+
             current = ""
 
         current += line + "\n"
@@ -886,7 +970,9 @@ async def roles_command(ctx):
             text=f"{len(ctx.guild.roles) - 1} roles"
         )
 
-        await ctx.send(embed=embed)
+        await ctx.send(
+            embed=embed
+        )
 
 
 # ============================================================
@@ -976,6 +1062,7 @@ async def serverinfo(ctx):
 async def temp(ctx):
 
     member = ctx.author
+
     bot_top = ctx.guild.me.top_role
 
     if member.bot:
@@ -992,6 +1079,7 @@ async def temp(ctx):
         )
 
     temp_data = load_temp_data()
+
     user_id = str(member.id)
 
     if user_id in temp_data:
@@ -999,6 +1087,10 @@ async def temp(ctx):
         return await ctx.send(
             "❌ You are already temporarily demoted."
         )
+
+    # --------------------------------------------------------
+    # SAVE ALL ORIGINAL ROLES
+    # --------------------------------------------------------
 
     current_roles = [
         role.id
@@ -1010,12 +1102,18 @@ async def temp(ctx):
 
     save_temp_data(temp_data)
 
+    # --------------------------------------------------------
+    # REMOVE MANAGEABLE ROLES EXCEPT PROTECTED
+    # --------------------------------------------------------
+
     roles_to_remove = [
         role
         for role in member.roles
-        if role != ctx.guild.default_role
-        and role.id not in TEMP_KEEP_ROLE_IDS
-        and role < bot_top
+        if (
+            role != ctx.guild.default_role
+            and role.id not in TEMP_KEEP_ROLE_IDS
+            and role < bot_top
+        )
     ]
 
     if roles_to_remove:
@@ -1024,17 +1122,24 @@ async def temp(ctx):
 
             await member.remove_roles(
                 *roles_to_remove,
-                reason=f"Temporary role removal by {ctx.author}"
+                reason=(
+                    f"Temporary role removal by "
+                    f"{ctx.author}"
+                )
             )
 
         except discord.Forbidden:
 
-            temp_data.pop(user_id, None)
+            temp_data.pop(
+                user_id,
+                None
+            )
+
             save_temp_data(temp_data)
 
             return await ctx.send(
-                "❌ I don't have permission to remove one or more "
-                "of these roles."
+                "❌ I don't have permission to remove one or "
+                "more of these roles."
             )
 
     kept_roles = [
@@ -1059,9 +1164,11 @@ async def temp(ctx):
 
     embed.add_field(
         name="🔒 Roles Kept",
-        value=", ".join(kept_roles)
-        if kept_roles
-        else "No protected roles found",
+        value=(
+            ", ".join(kept_roles)
+            if kept_roles
+            else "No protected roles found"
+        ),
         inline=False
     )
 
@@ -1137,6 +1244,7 @@ async def canceltemp(ctx):
         )
 
     member = ctx.author
+
     user_id = str(member.id)
 
     temp_data = load_temp_data()
@@ -1144,12 +1252,14 @@ async def canceltemp(ctx):
     if user_id not in temp_data:
 
         return await ctx.send(
-            f"❌ No saved roles were found for {member.mention}."
+            f"❌ No saved roles were found for "
+            f"{member.mention}."
         )
 
     saved_role_ids = temp_data[user_id]
 
     restored_roles = []
+
     skipped_roles = []
 
     for role_id in saved_role_ids:
@@ -1165,6 +1275,7 @@ async def canceltemp(ctx):
         if role >= ctx.guild.me.top_role:
 
             skipped_roles.append(role)
+
             continue
 
         if role not in member.roles:
@@ -1177,16 +1288,21 @@ async def canceltemp(ctx):
 
             await member.add_roles(
                 *restored_roles,
-                reason=f"Temporary demotion cancelled by {ctx.author}"
+                reason=(
+                    f"Temporary demotion cancelled by "
+                    f"{ctx.author}"
+                )
             )
 
         except discord.Forbidden:
 
             return await ctx.send(
-                "❌ I don't have permission to restore one or more roles."
+                "❌ I don't have permission to restore one "
+                "or more roles."
             )
 
     del temp_data[user_id]
+
     save_temp_data(temp_data)
 
     embed = discord.Embed(
@@ -1239,404 +1355,145 @@ async def canceltemp(ctx):
 
 
 # ============================================================
-# $TO @USER TIME
-# Supports:
-# s = seconds
-# m = minutes
-# h = hours
-# d = days
-#
-# Examples:
-# $to @user 10m
-# $to @user 1h
-# $to @user 30s
-# $to @user 2d
-# ============================================================
-
-@bot.command(name="to")
-@commands.has_permissions(moderate_members=True)
-async def timeout_command(ctx, member: discord.Member, duration: str):
-
-    if member == ctx.author:
-
-        return await ctx.send(
-            "❌ You cannot timeout yourself."
-        )
-
-    if member == ctx.guild.owner:
-
-        return await ctx.send(
-            "❌ You cannot timeout the server owner."
-        )
-
-    match = re.fullmatch(
-        r"(\d+)(s|m|h|d)",
-        duration.lower()
-    )
-
-    if not match:
-
-        return await ctx.send(
-            "❌ Invalid time.\n"
-            "Use `s`, `m`, `h`, or `d`.\n\n"
-            "Examples:\n"
-            "`$to @user 30s`\n"
-            "`$to @user 10m`\n"
-            "`$to @user 1h`\n"
-            "`$to @user 2d`"
-        )
-
-    amount = int(match.group(1))
-    unit = match.group(2)
-
-    multipliers = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 86400
-    }
-
-    seconds = amount * multipliers[unit]
-
-    if seconds > 28 * 24 * 60 * 60:
-
-        return await ctx.send(
-            "❌ Discord only allows timeouts up to **28 days**."
-        )
-
-    if member.top_role >= ctx.guild.me.top_role:
-
-        return await ctx.send(
-            "❌ I cannot timeout this member because their "
-            "highest role is equal to or higher than mine."
-        )
-
-    try:
-
-        await member.timeout(
-            discord.utils.utcnow() + discord.timedelta(seconds=seconds),
-            reason=f"Timeout by {ctx.author}"
-        )
-
-    except AttributeError:
-
-        import datetime
-
-        await member.timeout(
-            datetime.timedelta(seconds=seconds),
-            reason=f"Timeout by {ctx.author}"
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to timeout this member."
-        )
-
-    await ctx.send(
-        f"🔇 {member.mention} has been timed out for **{duration}**."
-    )
-
-
-@timeout_command.error
-async def timeout_error(ctx, error):
-
-    if isinstance(error, commands.MissingPermissions):
-
-        await ctx.send(
-            "❌ You need the **Timeout Members** permission."
-        )
-
-    elif isinstance(error, commands.MissingRequiredArgument):
-
-        await ctx.send(
-            "❌ Usage: `$to @user (time)`"
-        )
-
-    elif isinstance(error, commands.BadArgument):
-
-        await ctx.send(
-            "❌ Usage: `$to @user (time)`"
-        )
-
-
-# ============================================================
-# $UNTO @USER
-# ============================================================
-
-@bot.command(name="unto")
-@commands.has_permissions(moderate_members=True)
-async def unto(ctx, member: discord.Member):
-
-    try:
-
-        await member.timeout(
-            None,
-            reason=f"Timeout removed by {ctx.author}"
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to remove this timeout."
-        )
-
-    await ctx.send(
-        f"🔊 Timeout removed from {member.mention}."
-    )
-
-
-# ============================================================
-# $BAN @USER OR ID
-# ============================================================
-
-@bot.command(name="ban")
-@commands.has_permissions(ban_members=True)
-async def ban_command(ctx, target):
-
-    member = await get_member(ctx, target)
-
-    if member is None:
-
-        try:
-            user = await bot.fetch_user(int(target))
-        except (ValueError, discord.NotFound, discord.HTTPException):
-            return await ctx.send(
-                "❌ Please provide a valid user mention or ID."
-            )
-
-        try:
-
-            await ctx.guild.ban(
-                user,
-                reason=f"Banned by {ctx.author}"
-            )
-
-        except discord.Forbidden:
-
-            return await ctx.send(
-                "❌ I don't have permission to ban this user."
-            )
-
-        return await ctx.send(
-            f"🔨 Banned **{user}**."
-        )
-
-    if member == ctx.guild.owner:
-
-        return await ctx.send(
-            "❌ You cannot ban the server owner."
-        )
-
-    if member.top_role >= ctx.guild.me.top_role:
-
-        return await ctx.send(
-            "❌ I cannot ban this member because their role "
-            "is equal to or higher than mine."
-        )
-
-    try:
-
-        await ctx.guild.ban(
-            member,
-            reason=f"Banned by {ctx.author}"
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to ban this member."
-        )
-
-    await ctx.send(
-        f"🔨 Banned {member.mention}."
-    )
-
-
-# ============================================================
-# $UNBAN USER ID
-# ============================================================
-
-@bot.command(name="unban")
-@commands.has_permissions(ban_members=True)
-async def unban_command(ctx, user_id: int):
-
-    try:
-
-        user = await bot.fetch_user(user_id)
-
-        await ctx.guild.unban(
-            user,
-            reason=f"Unbanned by {ctx.author}"
-        )
-
-    except discord.NotFound:
-
-        return await ctx.send(
-            "❌ That user is not banned or the ID is invalid."
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to unban users."
-        )
-
-    await ctx.send(
-        f"✅ Unbanned **{user}**."
-    )
-
-
-# ============================================================
-# $KICK @USER OR ID
-# ============================================================
-
-@bot.command(name="kick")
-@commands.has_permissions(kick_members=True)
-async def kick_command(ctx, target):
-
-    member = await get_member(ctx, target)
-
-    if member is None:
-
-        return await ctx.send(
-            "❌ The user must be in the server. "
-            "Use a mention or user ID."
-        )
-
-    if member == ctx.guild.owner:
-
-        return await ctx.send(
-            "❌ You cannot kick the server owner."
-        )
-
-    if member.top_role >= ctx.guild.me.top_role:
-
-        return await ctx.send(
-            "❌ I cannot kick this member because their "
-            "highest role is equal to or higher than mine."
-        )
-
-    try:
-
-        await member.kick(
-            reason=f"Kicked by {ctx.author}"
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to kick this member."
-        )
-
-    await ctx.send(
-        f"👢 Kicked {member.mention}."
-    )
-
-
-# ============================================================
-# $PURGE NUMBER
-# ============================================================
-
-@bot.command(name="purge")
-@commands.has_permissions(manage_messages=True)
-async def purge_command(ctx, amount: int):
-
-    if amount <= 0:
-
-        return await ctx.send(
-            "❌ The number must be greater than 0."
-        )
-
-    if amount > 100:
-
-        return await ctx.send(
-            "❌ You can purge a maximum of **100 messages** at once."
-        )
-
-    try:
-
-        deleted = await ctx.channel.purge(
-            limit=amount + 1
-        )
-
-    except discord.Forbidden:
-
-        return await ctx.send(
-            "❌ I don't have permission to delete messages here."
-        )
-
-    count = max(0, len(deleted) - 1)
-
-    message = await ctx.send(
-        f"🧹 Deleted **{count}** message(s)."
-    )
-
-    await asyncio.sleep(3)
-
-    try:
-        await message.delete()
-    except discord.NotFound:
-        pass
-
-
-# ============================================================
-# TICKET HELPER
-# ============================================================
-
-def is_ticket_channel(ctx):
-
-    if not isinstance(ctx.channel, discord.TextChannel):
-        return False
-
-    name = ctx.channel.name.lower()
-
-    return (
-        "ticket" in name
-        or "ticket-" in name
-    )
-
-
-# ============================================================
 # $CLAIM
 # ============================================================
 
 @bot.command(name="claim")
 @commands.has_permissions(manage_channels=True)
-async def claim_ticket(ctx):
+async def claim(ctx):
 
-    if not is_ticket_channel(ctx):
+    if not is_ticket_channel(ctx.channel):
 
         return await ctx.send(
-            "❌ This command can only be used inside a ticket."
+            "❌ This command can only be used in a ticket."
         )
 
+    topic = ctx.channel.topic or ""
+
+    claimed_id = 0
+
+    if "claimed=" in topic:
+
+        try:
+
+            claimed_id = int(
+                topic.split("claimed=")[1]
+                .split(";")[0]
+            )
+
+        except (ValueError, IndexError):
+
+            claimed_id = 0
+
+    if claimed_id != 0:
+
+        claimed_member = ctx.guild.get_member(
+            claimed_id
+        )
+
+        if claimed_member:
+
+            return await ctx.send(
+                f"❌ This ticket is already claimed by "
+                f"{claimed_member.mention}."
+            )
+
+    owner_id = 0
+
+    if "owner=" in topic:
+
+        try:
+
+            owner_id = int(
+                topic.split("owner=")[1]
+                .split(";")[0]
+            )
+
+        except (ValueError, IndexError):
+
+            owner_id = 0
+
+    new_topic = (
+        f"owner={owner_id};"
+        f"claimed={ctx.author.id}"
+    )
+
+    try:
+
+        await ctx.channel.edit(
+            topic=new_topic,
+            reason=f"Ticket claimed by {ctx.author}"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I need **Manage Channels** permission."
+        )
+
+    # --------------------------------------------------------
+    # FIND MIDDLEMAN ROLE
+    # --------------------------------------------------------
+
     middleman_role = discord.utils.find(
-        lambda r: "middleman" in r.name.lower(),
+        lambda role: role.name.lower() == "middleman",
         ctx.guild.roles
     )
 
-    if middleman_role is None:
+    # --------------------------------------------------------
+    # HIDE FROM MIDDLEMEN
+    # --------------------------------------------------------
 
-        return await ctx.send(
-            "❌ I couldn't find a Middleman role."
+    if middleman_role:
+
+        try:
+
+            await ctx.channel.set_permissions(
+                middleman_role,
+                view_channel=False,
+                reason=f"Ticket claimed by {ctx.author}"
+            )
+
+        except discord.Forbidden:
+            pass
+
+    # --------------------------------------------------------
+    # GIVE CLAIMER ACCESS
+    # --------------------------------------------------------
+
+    try:
+
+        await ctx.channel.set_permissions(
+            ctx.author,
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            reason=f"Ticket claimed by {ctx.author}"
         )
 
-    await ctx.channel.set_permissions(
-        middleman_role,
-        view_channel=False
+    except discord.Forbidden:
+        pass
+
+    embed = discord.Embed(
+        title="🎫 Ticket Claimed",
+        description=(
+            f"🔒 This ticket has been claimed by "
+            f"{ctx.author.mention}."
+        ),
+        color=discord.Color.from_rgb(255, 20, 180)
     )
 
-    await ctx.channel.set_permissions(
-        ctx.author,
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True
+    embed.add_field(
+        name="👮 Claimed By",
+        value=ctx.author.mention,
+        inline=False
     )
 
-    await ctx.send(
-        f"🎫 {ctx.author.mention} has claimed this ticket."
+    embed.set_footer(
+        text="Use $unclaim to release this ticket."
     )
+
+    await ctx.send(embed=embed)
 
 
 # ============================================================
@@ -1645,591 +1502,429 @@ async def claim_ticket(ctx):
 
 @bot.command(name="unclaim")
 @commands.has_permissions(manage_channels=True)
-async def unclaim_ticket(ctx):
+async def unclaim(ctx):
 
-    if not is_ticket_channel(ctx):
-
-        return await ctx.send(
-            "❌ This command can only be used inside a ticket."
-        )
-
-    middleman_role = discord.utils.find(
-        lambda r: "middleman" in r.name.lower(),
-        ctx.guild.roles
-    )
-
-    if middleman_role is None:
+    if not is_ticket_channel(ctx.channel):
 
         return await ctx.send(
-            "❌ I couldn't find a Middleman role."
+            "❌ This command can only be used in a ticket."
         )
 
-    await ctx.channel.set_permissions(
-        middleman_role,
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True
-    )
+    topic = ctx.channel.topic or ""
 
-    await ctx.channel.set_permissions(
-        ctx.author,
-        overwrite=None
-    )
+    owner_id = 0
 
-    await ctx.send(
-        f"🔓 {ctx.author.mention} has unclaimed this ticket."
-    )
+    if "owner=" in topic:
 
+        try:
 
-# ============================================================
-# $TRANSFERTICKET @USER OR ID
-# ============================================================
+            owner_id = int(
+                topic.split("owner=")[1]
+                .split(";")[0]
+            )
 
-@bot.command(name="transferticket")
-@commands.has_permissions(manage_channels=True)
-async def transferticket(ctx, target):
+        except (ValueError, IndexError):
 
-    if not is_ticket_channel(ctx):
+            owner_id = 0
+
+    claimed_id = 0
+
+    if "claimed=" in topic:
+
+        try:
+
+            claimed_id = int(
+                topic.split("claimed=")[1]
+                .split(";")[0]
+            )
+
+        except (ValueError, IndexError):
+
+            claimed_id = 0
+
+    if claimed_id == 0:
 
         return await ctx.send(
-            "❌ This command can only be used inside a ticket."
+            "❌ This ticket is not claimed."
         )
 
-    member = await get_member(ctx, target)
-
-    if member is None:
-
-        return await ctx.send(
-            "❌ Please mention a valid server member or use their ID."
-        )
-
-    await ctx.channel.set_permissions(
-        member,
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True
+    new_topic = (
+        f"owner={owner_id};"
+        f"claimed=0"
     )
-
-    await ctx.send(
-        f"🎫 Ticket transferred to {member.mention}."
-    )
-
-
-# ============================================================
-# $TRANSFERROLES @USER
-# ============================================================
-
-@bot.command(name="transferroles")
-@commands.has_permissions(manage_roles=True)
-async def transferroles(ctx, target):
-
-    member = await get_member(ctx, target)
-
-    if member is None:
-
-        return await ctx.send(
-            "❌ Please mention a valid server member or use their ID."
-        )
-
-    source = ctx.author
-
-    roles_to_transfer = [
-        role
-        for role in source.roles
-        if role != ctx.guild.default_role
-        and role < ctx.guild.me.top_role
-        and role < ctx.author.top_role
-    ]
-
-    if not roles_to_transfer:
-
-        return await ctx.send(
-            "❌ You have no transferable roles."
-        )
-
-    added = []
-
-    for role in roles_to_transfer:
-
-        if role >= member.top_role and role >= ctx.guild.me.top_role:
-            continue
-
-        if role not in member.roles:
-
-            try:
-
-                await member.add_roles(
-                    role,
-                    reason=f"Role transfer by {ctx.author}"
-                )
-
-                added.append(role)
-
-            except discord.Forbidden:
-                pass
-
-    await ctx.send(
-        f"🔄 Transferred **{len(added)}** role(s) to {member.mention}."
-    )
-
-
-# ============================================================
-# $ADD USER
-# ============================================================
-
-@bot.command(name="add")
-@commands.has_permissions(manage_channels=True)
-async def add_ticket_member(ctx, target):
-
-    if not is_ticket_channel(ctx):
-
-        return await ctx.send(
-            "❌ This command can only be used inside a ticket."
-        )
-
-    member = await get_member(ctx, target)
-
-    if member is None:
-
-        return await ctx.send(
-            "❌ Please mention a valid server member or use their ID."
-        )
-
-    await ctx.channel.set_permissions(
-        member,
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True
-    )
-
-    await ctx.send(
-        f"✅ Added {member.mention} to this ticket."
-    )
-
-
-# ============================================================
-# $BACKUP
-# ============================================================
-
-BACKUP_FILE = "server_backup.json"
-
-
-@bot.command(name="backup")
-@commands.has_permissions(administrator=True)
-async def backup_command(ctx):
-
-    guild = ctx.guild
-
-    backup = {
-        "guild_name": guild.name,
-        "roles": [],
-        "categories": [],
-        "channels": []
-    }
-
-    # --------------------------------------------------------
-    # ROLES
-    # --------------------------------------------------------
-
-    for role in guild.roles:
-
-        if role == guild.default_role:
-            continue
-
-        backup["roles"].append({
-            "name": role.name,
-            "permissions": role.permissions.value,
-            "color": role.color.value,
-            "hoist": role.hoist,
-            "mentionable": role.mentionable
-        })
-
-    # --------------------------------------------------------
-    # CATEGORIES
-    # --------------------------------------------------------
-
-    for category in guild.categories:
-
-        backup["categories"].append({
-            "name": category.name,
-            "position": category.position
-        })
-
-    # --------------------------------------------------------
-    # CHANNELS
-    # --------------------------------------------------------
-
-    for channel in guild.channels:
-
-        if isinstance(channel, discord.CategoryChannel):
-
-            continue
-
-        data = {
-            "name": channel.name,
-            "type": str(channel.type),
-            "position": channel.position,
-            "category": channel.category.name
-            if channel.category
-            else None
-        }
-
-        if isinstance(channel, discord.TextChannel):
-
-            data["topic"] = channel.topic
-            data["slowmode_delay"] = channel.slowmode_delay
-            data["nsfw"] = channel.nsfw
-
-        elif isinstance(channel, discord.VoiceChannel):
-
-            data["bitrate"] = channel.bitrate
-            data["user_limit"] = channel.user_limit
-
-        backup["channels"].append(data)
-
-    with open(BACKUP_FILE, "w") as f:
-
-        json.dump(
-            backup,
-            f,
-            indent=4
-        )
-
-    await ctx.send(
-        f"✅ Server backup created.\n"
-        f"📁 `{BACKUP_FILE}`"
-    )
-
-
-# ============================================================
-# $RESTORE
-# ============================================================
-
-@bot.command(name="restore")
-@commands.has_permissions(administrator=True)
-async def restore_command(ctx):
-
-    if not os.path.exists(BACKUP_FILE):
-
-        return await ctx.send(
-            "❌ No server backup was found."
-        )
 
     try:
 
-        with open(BACKUP_FILE, "r") as f:
-
-            backup = json.load(f)
-
-    except (json.JSONDecodeError, OSError):
-
-        return await ctx.send(
-            "❌ The backup file is invalid."
+        await ctx.channel.edit(
+            topic=new_topic,
+            reason=f"Ticket unclaimed by {ctx.author}"
         )
 
-    await ctx.send(
-        "⚠️ **Server restore started.**\n"
-        "This will recreate missing roles and channels from "
-        "the saved backup."
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I need **Manage Channels** permission."
+        )
+
+    middleman_role = discord.utils.find(
+        lambda role: role.name.lower() == "middleman",
+        ctx.guild.roles
     )
 
-    # --------------------------------------------------------
-    # RESTORE ROLES
-    # --------------------------------------------------------
-
-    existing_roles = {
-        role.name: role
-        for role in ctx.guild.roles
-    }
-
-    created_roles = 0
-
-    for role_data in backup.get("roles", []):
-
-        if role_data["name"] in existing_roles:
-            continue
+    if middleman_role:
 
         try:
 
-            await ctx.guild.create_role(
-                name=role_data["name"],
-                permissions=discord.Permissions(
-                    role_data["permissions"]
-                ),
-                colour=discord.Colour(
-                    role_data["color"]
-                ),
-                hoist=role_data["hoist"],
-                mentionable=role_data["mentionable"],
-                reason="Server backup restore"
+            await ctx.channel.set_permissions(
+                middleman_role,
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                reason=f"Ticket unclaimed by {ctx.author}"
             )
-
-            created_roles += 1
 
         except discord.Forbidden:
-
             pass
 
-    # --------------------------------------------------------
-    # RESTORE CATEGORIES
-    # --------------------------------------------------------
-
-    existing_categories = {
-        category.name: category
-        for category in ctx.guild.categories
-    }
-
-    created_categories = 0
-
-    for category_data in backup.get("categories", []):
-
-        if category_data["name"] in existing_categories:
-            continue
-
-        try:
-
-            category = await ctx.guild.create_category(
-                category_data["name"],
-                reason="Server backup restore"
-            )
-
-            existing_categories[category.name] = category
-            created_categories += 1
-
-        except discord.Forbidden:
-
-            pass
-
-    # --------------------------------------------------------
-    # RESTORE CHANNELS
-    # --------------------------------------------------------
-
-    existing_channels = {
-        channel.name
-        for channel in ctx.guild.channels
-    }
-
-    created_channels = 0
-
-    for channel_data in backup.get("channels", []):
-
-        name = channel_data["name"]
-
-        if name in existing_channels:
-            continue
-
-        category = None
-
-        category_name = channel_data.get("category")
-
-        if category_name:
-
-            category = existing_categories.get(
-                category_name
-            )
-
-        try:
-
-            if channel_data["type"] == "text":
-
-                await ctx.guild.create_text_channel(
-                    name,
-                    category=category,
-                    topic=channel_data.get("topic"),
-                    slowmode_delay=channel_data.get(
-                        "slowmode_delay",
-                        0
-                    ),
-                    nsfw=channel_data.get(
-                        "nsfw",
-                        False
-                    ),
-                    reason="Server backup restore"
-                )
-
-                created_channels += 1
-
-            elif channel_data["type"] == "voice":
-
-                await ctx.guild.create_voice_channel(
-                    name,
-                    category=category,
-                    bitrate=channel_data.get(
-                        "bitrate"
-                    ),
-                    user_limit=channel_data.get(
-                        "user_limit",
-                        0
-                    ),
-                    reason="Server backup restore"
-                )
-
-                created_channels += 1
-
-        except (discord.Forbidden, discord.HTTPException):
-
-            pass
-
-    await ctx.send(
-        "✅ **Server restore finished.**\n\n"
-        f"🎭 Roles created: **{created_roles}**\n"
-        f"📁 Categories created: **{created_categories}**\n"
-        f"💬 Channels created: **{created_channels}**"
+    claimed_member = ctx.guild.get_member(
+        claimed_id
     )
 
+    if claimed_member:
 
-# ============================================================
-# $HELP
-# ============================================================
+        try:
 
-bot.remove_command("help")
+            await ctx.channel.set_permissions(
+                claimed_member,
+                overwrite=None,
+                reason="Ticket unclaimed"
+            )
 
-
-@bot.command(name="help")
-async def help_command(ctx):
+        except discord.Forbidden:
+            pass
 
     embed = discord.Embed(
-        title="📖 Bot Commands",
+        title="🔓 Ticket Unclaimed",
         description=(
-            "Here are all available commands.\n"
-            "Commands requiring permissions can only be used "
-            "by members with the required permissions."
+            f"{ctx.author.mention} has unclaimed this ticket."
         ),
         color=discord.Color.from_rgb(255, 20, 180)
     )
 
     embed.add_field(
-        name="⭐ Vouch Commands",
-        value=(
-            "`$addvouch @user (number)` — Add vouches\n"
-            "`$removevouch @user (number)` — Remove vouches\n"
-            "`$vouches @user` — Check vouches"
-        ),
+        name="📂 Status",
+        value="Available to Middlemen",
         inline=False
-    )
-
-    embed.add_field(
-        name="🎭 Role Commands",
-        value=(
-            "`$role @user @role` — Give a role\n"
-            "`$promo @user` — Promote a user\n"
-            "`$demo @user` — Demote a user\n"
-            "`$fill @user` — Fill missing roles\n"
-            "`$roles` — Show server roles"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="⏸️ Temporary Role Commands",
-        value=(
-            "`$temp` — Temporarily remove roles\n"
-            "`$canceltemp` — Restore saved roles"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="👤 User / Server Commands",
-        value=(
-            "`$w @user` — View user profile\n"
-            "`$serverinfo` — View server information"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🛡️ Moderation Commands",
-        value=(
-            "`$to @user (time)` — Timeout a member\n"
-            "`$unto @user` — Remove timeout\n"
-            "`$ban @user / ID` — Ban a member\n"
-            "`$unban (user ID)` — Unban a member\n"
-            "`$kick @user / ID` — Kick a member\n"
-            "`$purge (number)` — Delete messages"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎫 Ticket Commands",
-        value=(
-            "`$claim` — Claim current ticket\n"
-            "`$unclaim` — Unclaim current ticket\n"
-            "`$transferticket @user / ID` — Transfer ticket\n"
-            "`$transferroles @user` — Transfer roles\n"
-            "`$add @user / ID` — Add member to ticket"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="💾 Server Backup",
-        value=(
-            "`$backup` — Create server backup\n"
-            "`$restore` — Restore server backup"
-        ),
-        inline=False
-    )
-
-    embed.set_thumbnail(
-        url=(
-            ctx.guild.icon.url
-            if ctx.guild and ctx.guild.icon
-            else discord.Embed.Empty
-        )
     )
 
     embed.set_footer(
-        text=f"Requested by {ctx.author.display_name}"
+        text="Use $claim to claim this ticket."
     )
 
     await ctx.send(embed=embed)
 
 
 # ============================================================
-# GLOBAL COMMAND ERROR HANDLER
+# $TRANSFERTICKET @USER OR USER ID
 # ============================================================
 
-@bot.event
-async def on_command_error(ctx, error):
+@bot.command(name="transferticket")
+@commands.has_permissions(manage_channels=True)
+async def transferticket(
+    ctx,
+    user_input: str
+):
 
-    if isinstance(error, commands.CommandNotFound):
-        return
-
-    if isinstance(error, commands.MissingPermissions):
-
-        return await ctx.send(
-            "❌ You don't have permission to use this command."
-        )
-
-    if isinstance(error, commands.MissingRequiredArgument):
+    if not is_ticket_channel(ctx.channel):
 
         return await ctx.send(
-            "❌ Missing required argument. Use `$help` to see usage."
+            "❌ This command can only be used in a ticket."
         )
 
-    if isinstance(error, commands.BadArgument):
-
-        return await ctx.send(
-            "❌ Invalid argument. Use `$help` to see the correct format."
-        )
-
-    if isinstance(error, commands.CommandInvokeError):
-
-        original = error.original
-
-        print(
-            f"❌ Error in command `{ctx.command}`: {original}"
-        )
-
-        return await ctx.send(
-            "❌ An error occurred while running this command."
-        )
-
-    print(
-        f"❌ Unhandled command error: {error}"
+    member = await get_member_from_input(
+        ctx,
+        user_input
     )
+
+    if member is None:
+
+        return await ctx.send(
+            "❌ I couldn't find that member.\n"
+            "Use: `$transferticket @user` or "
+            "`$transferticket userID`"
+        )
+
+    if member.bot:
+
+        return await ctx.send(
+            "❌ You cannot transfer a ticket to a bot."
+        )
+
+    topic = ctx.channel.topic or ""
+
+    owner_id = 0
+
+    if "owner=" in topic:
+
+        try:
+
+            owner_id = int(
+                topic.split("owner=")[1]
+                .split(";")[0]
+            )
+
+        except (ValueError, IndexError):
+
+            owner_id = 0
+
+    claimed_id = 0
+
+    if "claimed=" in topic:
+
+        try:
+
+            claimed_id = int(
+                topic.split("claimed=")[1]
+                .split(";")[0]
+            )
+
+        except (ValueError, IndexError):
+
+            claimed_id = 0
+
+    new_topic = (
+        f"owner={owner_id};"
+        f"claimed={member.id}"
+    )
+
+    try:
+
+        await ctx.channel.edit(
+            topic=new_topic,
+            reason=(
+                f"Ticket transferred from "
+                f"{ctx.author} to {member}"
+            )
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I need **Manage Channels** permission."
+        )
+
+    # --------------------------------------------------------
+    # REMOVE OLD CLAIMER
+    # --------------------------------------------------------
+
+    if (
+        claimed_id
+        and claimed_id != member.id
+    ):
+
+        old_claimer = ctx.guild.get_member(
+            claimed_id
+        )
+
+        if old_claimer:
+
+            try:
+
+                await ctx.channel.set_permissions(
+                    old_claimer,
+                    overwrite=None,
+                    reason="Ticket transferred"
+                )
+
+            except discord.Forbidden:
+                pass
+
+    # --------------------------------------------------------
+    # HIDE FROM MIDDLEMEN
+    # --------------------------------------------------------
+
+    middleman_role = discord.utils.find(
+        lambda role: role.name.lower() == "middleman",
+        ctx.guild.roles
+    )
+
+    if middleman_role:
+
+        try:
+
+            await ctx.channel.set_permissions(
+                middleman_role,
+                view_channel=False,
+                reason="Ticket transferred"
+            )
+
+        except discord.Forbidden:
+            pass
+
+    # --------------------------------------------------------
+    # GIVE NEW MEMBER ACCESS
+    # --------------------------------------------------------
+
+    try:
+
+        await ctx.channel.set_permissions(
+            member,
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            reason="Ticket transferred"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I couldn't give the new user access."
+        )
+
+    embed = discord.Embed(
+        title="🔄 Ticket Transferred",
+        description=(
+            f"🎫 This ticket has been transferred to "
+            f"{member.mention}."
+        ),
+        color=discord.Color.from_rgb(255, 20, 180)
+    )
+
+    embed.add_field(
+        name="👤 New Ticket Holder",
+        value=member.mention,
+        inline=False
+    )
+
+    embed.add_field(
+        name="👮 Transferred By",
+        value=ctx.author.mention,
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
+
+@transferticket.error
+async def transferticket_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingRequiredArgument
+    ):
+
+        await ctx.send(
+            "❌ Usage: `$transferticket @user` or "
+            "`$transferticket userID`"
+        )
+
+
+# ============================================================
+# $ADD @USER OR USER ID
+# ============================================================
+
+@bot.command(name="add")
+@commands.has_permissions(manage_channels=True)
+async def add_user(
+    ctx,
+    user_input: str
+):
+
+    if not is_ticket_channel(ctx.channel):
+
+        return await ctx.send(
+            "❌ This command can only be used in a ticket."
+        )
+
+    member = await get_member_from_input(
+        ctx,
+        user_input
+    )
+
+    if member is None:
+
+        return await ctx.send(
+            "❌ I couldn't find that member.\n"
+            "Use: `$add @user` or `$add userID`"
+        )
+
+    if member.bot:
+
+        return await ctx.send(
+            "❌ You cannot add a bot to the ticket."
+        )
+
+    permissions = ctx.channel.permissions_for(
+        member
+    )
+
+    if permissions.view_channel:
+
+        return await ctx.send(
+            f"❌ {member.mention} already has access "
+            f"to this ticket."
+        )
+
+    try:
+
+        await ctx.channel.set_permissions(
+            member,
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            reason=f"Added to ticket by {ctx.author}"
+        )
+
+    except discord.Forbidden:
+
+        return await ctx.send(
+            "❌ I need **Manage Channels** permission "
+            "to add people to tickets."
+        )
+
+    embed = discord.Embed(
+        title="👤 Member Added",
+        description=(
+            f"{member.mention} has been added to this ticket."
+        ),
+        color=discord.Color.from_rgb(255, 20, 180)
+    )
+
+    embed.add_field(
+        name="👤 Added Member",
+        value=member.mention,
+        inline=False
+    )
+
+    embed.add_field(
+        name="👮 Added By",
+        value=ctx.author.mention,
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
+
+@add_user.error
+async def add_user_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingRequiredArgument
+    ):
+
+        await ctx.send(
+            "❌ Usage: `$add @user` or `$add userID`"
+        )
+
+    elif isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        await ctx.send(
+            "❌ You need the **Manage Channels** permission."
+        )
 
 
 # ============================================================
@@ -2244,7 +1939,8 @@ async def on_ready():
     )
 
     print(
-        f"✅ Bot is running in {len(bot.guilds)} server(s)"
+        f"✅ Bot is running in "
+        f"{len(bot.guilds)} server(s)"
     )
 
 
