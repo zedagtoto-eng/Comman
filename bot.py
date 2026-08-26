@@ -1018,7 +1018,7 @@ async def temp(ctx, member: discord.Member):
 
         kept_roles = []
 
-        for role_id in TEMP_KEEP_ROLE_IDS:
+        for role_id in TEMP_KEEP_ROLE_IDS:1541096480146853968 1541096476610928730
 
             role = ctx.guild.get_role(role_id)
 
