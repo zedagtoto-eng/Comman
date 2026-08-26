@@ -43,10 +43,6 @@ TEMP_FILE = "temp_roles.json"
 # ============================================================
 # TEMP ROLE SETTINGS
 # ============================================================
-# These 2 roles are kept when $temp is used.
-#
-# These 2 roles can also use $canceltemp.
-# ============================================================
 
 TEMP_KEEP_ROLE_IDS = [
     1541096480146853968,
@@ -142,7 +138,9 @@ async def addvouch(ctx, member: discord.Member, amount: int = 1):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     embed.set_footer(
         text=f"Vouch profile • {member.display_name}"
@@ -222,7 +220,9 @@ async def removevouch(ctx, member: discord.Member, amount: int = 1):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     await ctx.send(embed=embed)
 
@@ -276,7 +276,9 @@ async def vouches_command(ctx, member: discord.Member = None):
         inline=False
     )
 
-    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_thumbnail(
+        url=member.display_avatar.url
+    )
 
     embed.set_footer(
         text=f"Vouch profile • {member.display_name}"
@@ -377,6 +379,7 @@ async def promo(ctx, member: discord.Member):
     ]
 
     if not current_manageable:
+
         next_role = (
             manageable_roles[0]
             if manageable_roles
@@ -384,6 +387,7 @@ async def promo(ctx, member: discord.Member):
         )
 
     else:
+
         highest_current = max(
             current_manageable,
             key=lambda r: r.position
@@ -396,7 +400,10 @@ async def promo(ctx, member: discord.Member):
         ]
 
         next_role = (
-            min(higher_roles, key=lambda r: r.position)
+            min(
+                higher_roles,
+                key=lambda r: r.position
+            )
             if higher_roles
             else None
         )
@@ -502,7 +509,10 @@ async def demo(ctx, member: discord.Member):
     ]
 
     next_role = (
-        max(lower_roles, key=lambda r: r.position)
+        max(
+            lower_roles,
+            key=lambda r: r.position
+        )
         if lower_roles
         else None
     )
@@ -590,6 +600,7 @@ async def profile(ctx, member: discord.Member = None):
     )
 
     if member.joined_at:
+
         embed.add_field(
             name="📅 Joined Guild",
             value=discord.utils.format_dt(
@@ -803,7 +814,9 @@ async def roles_command(ctx):
             text=f"{len(ctx.guild.roles) - 1} roles"
         )
 
-        await ctx.send(embed=embed)
+        await ctx.send(
+            embed=embed
+        )
 
 
 # ============================================================
@@ -872,6 +885,7 @@ async def serverinfo(ctx):
     )
 
     if guild.icon:
+
         embed.set_thumbnail(
             url=guild.icon.url
         )
@@ -880,7 +894,9 @@ async def serverinfo(ctx):
         text=f"Server info • {guild.name}"
     )
 
-    await ctx.send(embed=embed)
+    await ctx.send(
+        embed=embed
+    )
 
 
 # ============================================================
@@ -888,12 +904,11 @@ async def serverinfo(ctx):
 # ============================================================
 # $temp has NO @user.
 #
-# It temporarily removes the roles from the person
-# who runs $temp.
+# It temps the person who runs $temp.
 #
 # The 2 protected roles remain.
 #
-# ALL original roles are saved for $canceltemp.
+# ALL original roles are saved.
 # ============================================================
 
 @bot.command(name="temp")
@@ -901,13 +916,12 @@ async def serverinfo(ctx):
 async def temp(ctx):
 
     member = ctx.author
+    bot_top = ctx.guild.me.top_role
 
     if member.bot:
         return await ctx.send(
             "❌ You cannot temp a bot."
         )
-
-    bot_top = ctx.guild.me.top_role
 
     if member.top_role >= bot_top:
         return await ctx.send(
@@ -917,10 +931,6 @@ async def temp(ctx):
 
     temp_data = load_temp_data()
     user_id = str(member.id)
-
-    # --------------------------------------------------------
-    # PREVENT DUPLICATE TEMP
-    # --------------------------------------------------------
 
     if user_id in temp_data:
         return await ctx.send(
@@ -964,8 +974,6 @@ async def temp(ctx):
 
         except discord.Forbidden:
 
-            # If removal fails, remove saved data so it
-            # doesn't leave a broken temp record.
             temp_data.pop(user_id, None)
             save_temp_data(temp_data)
 
@@ -1033,40 +1041,60 @@ async def temp(ctx):
     )
 
     embed.set_footer(
-        text="Use $canceltemp @user to restore the saved roles"
+        text="Use $canceltemp to restore your saved roles"
     )
 
-    await ctx.send(embed=embed)
+    await ctx.send(
+        embed=embed
+    )
 
 
 @temp.error
 async def temp_error(ctx, error):
 
     if isinstance(error, commands.MissingPermissions):
+
         await ctx.send(
-            "❌ You need the **Manage Roles** permission to use `$temp`."
+            "❌ You need the **Manage Roles** permission "
+            "to use `$temp`."
         )
 
 
 # ============================================================
-# $CANCELTEMP @USER
+# $CANCELTEMP
 # ============================================================
-# The person using this command does NOT need Manage Roles.
+# $canceltemp has NO @user.
 #
-# They only need ONE of the 2 protected roles.
+# It restores the saved roles of the person who runs it.
+#
+# The user only needs ONE of these 2 roles:
+#
+# 1541096480146853968
+# 1541096476610928730
+#
+# The user does NOT need Manage Roles.
 #
 # The BOT must have Manage Roles.
 # ============================================================
 
 @bot.command(name="canceltemp")
-async def canceltemp(ctx, member: discord.Member):
+async def canceltemp(ctx):
 
     # --------------------------------------------------------
-    # CHECK FOR ONE OF THE 2 PROTECTED ROLES
+    # REQUIRED ROLE IDS
+    # --------------------------------------------------------
+
+    allowed_role_ids = [
+        1541096480146853968,
+        1541096476610928730
+    ]
+
+    # --------------------------------------------------------
+    # CHECK USER'S ROLES
     # --------------------------------------------------------
 
     has_temp_permission = any(
-        role.id in TEMP_KEEP_ROLE_IDS
+        role.id in allowed_role_ids
         for role in ctx.author.roles
     )
 
@@ -1089,11 +1117,17 @@ async def canceltemp(ctx, member: discord.Member):
         )
 
     # --------------------------------------------------------
+    # TARGET = PERSON USING $CANCELTEMP
+    # --------------------------------------------------------
+
+    member = ctx.author
+    user_id = str(member.id)
+
+    # --------------------------------------------------------
     # LOAD SAVED DATA
     # --------------------------------------------------------
 
     temp_data = load_temp_data()
-    user_id = str(member.id)
 
     if user_id not in temp_data:
 
@@ -1121,10 +1155,12 @@ async def canceltemp(ctx, member: discord.Member):
             continue
 
         if role >= ctx.guild.me.top_role:
+
             skipped_roles.append(role)
             continue
 
         if role not in member.roles:
+
             restored_roles.append(role)
 
     # --------------------------------------------------------
@@ -1148,11 +1184,11 @@ async def canceltemp(ctx, member: discord.Member):
             return await ctx.send(
                 "❌ I don't have permission to restore one or "
                 "more roles. Make sure my bot role is above "
-                "the roles I need to restore."
+                "the roles it needs to restore."
             )
 
     # --------------------------------------------------------
-    # DELETE TEMP DATA
+    # DELETE SAVED TEMP DATA
     # --------------------------------------------------------
 
     del temp_data[user_id]
@@ -1208,22 +1244,18 @@ async def canceltemp(ctx, member: discord.Member):
         text="Temporary demotion cancelled"
     )
 
-    await ctx.send(embed=embed)
+    await ctx.send(
+        embed=embed
+    )
 
 
 @canceltemp.error
 async def canceltemp_error(ctx, error):
 
-    if isinstance(error, commands.MissingRequiredArgument):
+    if isinstance(error, commands.BadArgument):
 
         await ctx.send(
-            "❌ Usage: `$canceltemp @user`"
-        )
-
-    elif isinstance(error, commands.BadArgument):
-
-        await ctx.send(
-            "❌ Please mention a valid member."
+            "❌ Invalid command format."
         )
 
 
