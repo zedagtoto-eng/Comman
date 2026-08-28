@@ -52,6 +52,16 @@ TICKET_CATEGORY_ID = 1541096510102437911
 
 
 # ============================================================
+# APPLICATION SETTINGS
+# ============================================================
+
+APPLICATION_ROLE_ID = 1541096476610928730
+RESULT_CHANNEL_ID = 1541096707985637496
+
+PINK = discord.Color.from_rgb(255, 105, 180)
+
+
+# ============================================================
 # TEMP ROLE SETTINGS
 # ============================================================
 
@@ -166,6 +176,421 @@ async def get_member_from_input(ctx, value):
             return member
 
     return None
+
+
+# ============================================================
+# APPLICATION BUTTONS
+# ============================================================
+
+class ApplicationView(discord.ui.View):
+
+    def __init__(self, member_id):
+
+        super().__init__(timeout=120)
+
+        self.member_id = member_id
+        self.finished = False
+
+    # ========================================================
+    # ONLY THE PINGED USER CAN CLICK
+    # ========================================================
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction
+    ):
+
+        if interaction.user.id != self.member_id:
+
+            await interaction.response.send_message(
+                "❌ This application is not for you.",
+                ephemeral=True
+            )
+
+            return False
+
+        return True
+
+    # ========================================================
+    # ACCEPT
+    # ========================================================
+
+    @discord.ui.button(
+        label="Accept",
+        emoji="✅",
+        style=discord.ButtonStyle.success,
+        custom_id="application_accept"
+    )
+    async def accept(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        if self.finished:
+
+            return await interaction.response.send_message(
+                "❌ This application has already been decided.",
+                ephemeral=True
+            )
+
+        guild = interaction.guild
+
+        if guild is None:
+
+            return await interaction.response.send_message(
+                "❌ This can only be used inside a server.",
+                ephemeral=True
+            )
+
+        member = guild.get_member(
+            self.member_id
+        )
+
+        if member is None:
+
+            try:
+
+                member = await guild.fetch_member(
+                    self.member_id
+                )
+
+            except discord.NotFound:
+
+                return await interaction.response.send_message(
+                    "❌ User is no longer in the server.",
+                    ephemeral=True
+                )
+
+        role = guild.get_role(
+            APPLICATION_ROLE_ID
+        )
+
+        if role is None:
+
+            return await interaction.response.send_message(
+                "❌ Application role was not found.\n"
+                "Check APPLICATION_ROLE_ID.",
+                ephemeral=True
+            )
+
+        # ====================================================
+        # ROLE HIERARCHY CHECK
+        # ====================================================
+
+        if role >= guild.me.top_role:
+
+            return await interaction.response.send_message(
+                "❌ I can't give this role.\n\n"
+                "Make sure my bot's highest role is ABOVE "
+                "the application role.",
+                ephemeral=True
+            )
+
+        # ====================================================
+        # GIVE ROLE
+        # ====================================================
+
+        try:
+
+            await member.add_roles(
+                role,
+                reason="Application accepted"
+            )
+
+        except discord.Forbidden:
+
+            return await interaction.response.send_message(
+                "❌ I can't give this role.\n\n"
+                "Make sure I have **Manage Roles** and "
+                "my bot role is above the application role.",
+                ephemeral=True
+            )
+
+        except discord.HTTPException:
+
+            return await interaction.response.send_message(
+                "❌ Discord returned an error while giving "
+                "the role. Please try again.",
+                ephemeral=True
+            )
+
+        self.finished = True
+
+        # ====================================================
+        # DISABLE BUTTONS
+        # ====================================================
+
+        for child in self.children:
+
+            child.disabled = True
+
+        # ====================================================
+        # ACCEPTED EMBED
+        # ====================================================
+
+        application_embed = discord.Embed(
+            title="Application Accepted",
+            description=(
+                f"✅ {member.mention} has been accepted "
+                f"and received {role.mention}."
+            ),
+            color=PINK
+        )
+
+        application_embed.set_footer(
+            text="Minstrea ~ MM service • Application System"
+        )
+
+        await interaction.response.edit_message(
+            embed=application_embed,
+            view=self
+        )
+
+        # ====================================================
+        # NEW FLOPPER CHANNEL
+        # ====================================================
+
+        result_channel = guild.get_channel(
+            RESULT_CHANNEL_ID
+        )
+
+        if result_channel is None:
+
+            print(
+                "❌ RESULT_CHANNEL_ID is incorrect "
+                "or the bot cannot see that channel."
+            )
+
+            return
+
+        welcome_embed = discord.Embed(
+            title="🎉 New Flopper!",
+            description=(
+                f"Congratulations {member.mention}, "
+                "you're now a flopper!\n\n"
+
+                "• To learn about flopping or how to get rich "
+                "join the main-guide channel\n\n"
+
+                "• To hangout with other floppers "
+                "talk in the staff-chat channel\n\n"
+
+                "• Lastly to get a middleman for your trades "
+                "do a ticket in the middleman channel"
+            ),
+            color=PINK
+        )
+
+        welcome_embed.set_thumbnail(
+            url=member.display_avatar.url
+        )
+
+        welcome_embed.set_footer(
+            text="Minstrea ~ MM service • New Flopper"
+        )
+
+        await result_channel.send(
+            content=member.mention,
+            embed=welcome_embed,
+            allowed_mentions=discord.AllowedMentions(
+                users=True
+            )
+        )
+
+    # ========================================================
+    # DECLINE
+    # ========================================================
+
+    @discord.ui.button(
+        label="Decline",
+        emoji="❌",
+        style=discord.ButtonStyle.danger,
+        custom_id="application_decline"
+    )
+    async def decline(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        if self.finished:
+
+            return await interaction.response.send_message(
+                "❌ This application has already been decided.",
+                ephemeral=True
+            )
+
+        guild = interaction.guild
+
+        if guild is None:
+
+            return await interaction.response.send_message(
+                "❌ This can only be used inside a server.",
+                ephemeral=True
+            )
+
+        member = guild.get_member(
+            self.member_id
+        )
+
+        if member is None:
+
+            try:
+
+                member = await guild.fetch_member(
+                    self.member_id
+                )
+
+            except discord.NotFound:
+
+                member = interaction.user
+
+        self.finished = True
+
+        # ====================================================
+        # DISABLE BUTTONS
+        # ====================================================
+
+        for child in self.children:
+
+            child.disabled = True
+
+        # ====================================================
+        # DECLINED EMBED
+        # ====================================================
+
+        embed = discord.Embed(
+            title="Application Declined",
+            description=(
+                f"❌ {member.mention}'s application "
+                "has been declined."
+            ),
+            color=PINK
+        )
+
+        embed.set_footer(
+            text="Minstrea ~ MM service • Application System"
+        )
+
+        await interaction.response.edit_message(
+            embed=embed,
+            view=self
+        )
+
+
+# ============================================================
+# APPLICATION TIMEOUT
+# ============================================================
+
+    async def on_timeout(self):
+
+        if self.finished:
+            return
+
+        self.finished = True
+
+        for child in self.children:
+            child.disabled = True
+
+
+# ============================================================
+# $TRIGGER @USER
+# ============================================================
+
+@bot.command(name="trigger")
+@commands.has_permissions(manage_guild=True)
+async def trigger(
+    ctx,
+    member: discord.Member
+):
+
+    embed = discord.Embed(
+        title="Minstrea ~ MM service",
+        description=(
+            f"{member.mention}\n\n"
+
+            "**Flopping Application 📄**\n"
+            "You can join a well-built system and community "
+            "where you can participate in server activities "
+            "and events.\n\n"
+
+            "**What is Flopping? ❓**\n"
+            "Flopping is where you participate in our "
+            "community activities and events.\n\n"
+
+            "Detailed information will be provided once "
+            "you accept this application.\n\n"
+
+            "**Flopping Offer**\n"
+            "Choose whether you want to accept or decline "
+            "the offer below.\n\n"
+
+            "‼️ **Note**\n"
+            "You only have two minutes to either **Accept** "
+            "or **Decline** the offer presented above. "
+            "Choose wisely, the clock is ticking.."
+        ),
+        color=PINK
+    )
+
+    embed.set_footer(
+        text="Minstrea ~ MM service • Application System"
+    )
+
+    view = ApplicationView(
+        member.id
+    )
+
+    await ctx.send(
+        content=member.mention,
+        embed=embed,
+        view=view,
+        allowed_mentions=discord.AllowedMentions(
+            users=True
+        )
+    )
+
+
+@trigger.error
+async def trigger_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingRequiredArgument
+    ):
+
+        return await ctx.send(
+            "❌ Usage: `$trigger @user`"
+        )
+
+    if isinstance(
+        error,
+        commands.MemberNotFound
+    ):
+
+        return await ctx.send(
+            "❌ I couldn't find that member."
+        )
+
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        return await ctx.send(
+            "❌ You need **Manage Server** permission "
+            "to use `$trigger`."
+        )
+
+    print(
+        f"❌ Trigger error: "
+        f"{type(error).__name__}: {error}"
+    )
+
+    await ctx.send(
+        "❌ An error occurred while running `$trigger`."
+    )
 
 
 # ============================================================
@@ -393,16 +818,19 @@ async def role_command(
 ):
 
     if role == ctx.guild.default_role:
+
         return await ctx.send(
             "❌ You cannot give the @everyone role."
         )
 
     if role.managed:
+
         return await ctx.send(
             "❌ You cannot manually assign a managed role."
         )
 
     if role >= ctx.guild.me.top_role:
+
         return await ctx.send(
             "❌ I cannot give that role because it is equal to "
             "or higher than my highest role."
@@ -412,12 +840,14 @@ async def role_command(
         role >= ctx.author.top_role
         and ctx.author != ctx.guild.owner
     ):
+
         return await ctx.send(
             "❌ You cannot manage a role equal to or higher "
             "than your highest role."
         )
 
     if role in member.roles:
+
         return await ctx.send(
             f"❌ {member.mention} already has {role.mention}."
         )
@@ -471,6 +901,7 @@ async def role_error(ctx, error):
 async def promo(ctx, member: discord.Member):
 
     if member.bot:
+
         return await ctx.send(
             "❌ You cannot promote a bot."
         )
@@ -524,6 +955,7 @@ async def promo(ctx, member: discord.Member):
         )
 
     if next_role is None:
+
         return await ctx.send(
             f"❌ {member.mention} cannot be promoted any further."
         )
@@ -532,6 +964,7 @@ async def promo(ctx, member: discord.Member):
         next_role >= ctx.author.top_role
         and ctx.author != ctx.guild.owner
     ):
+
         return await ctx.send(
             "❌ You cannot promote someone to a role equal to "
             "or higher than your highest role."
@@ -546,6 +979,7 @@ async def promo(ctx, member: discord.Member):
     try:
 
         if remove_roles:
+
             await member.remove_roles(
                 *remove_roles,
                 reason=f"Promotion by {ctx.author}"
@@ -599,6 +1033,7 @@ async def promo_error(ctx, error):
 async def demo(ctx, member: discord.Member):
 
     if member.bot:
+
         return await ctx.send(
             "❌ You cannot demote a bot."
         )
@@ -622,6 +1057,7 @@ async def demo(ctx, member: discord.Member):
     ]
 
     if not current_manageable:
+
         return await ctx.send(
             f"❌ {member.mention} has no manageable role to demote."
         )
@@ -654,6 +1090,7 @@ async def demo(ctx, member: discord.Member):
         )
 
         if next_role is not None:
+
             await member.add_roles(
                 next_role,
                 reason=f"Demotion by {ctx.author}"
@@ -666,6 +1103,7 @@ async def demo(ctx, member: discord.Member):
         )
 
     if next_role is None:
+
         return await ctx.send(
             f"⬇️ {member.mention} was demoted and "
             f"{highest_current.mention} was removed."
@@ -1082,6 +1520,7 @@ async def serverinfo(ctx):
     )
 
     if guild.icon:
+
         embed.set_thumbnail(
             url=guild.icon.url
         )
@@ -1291,14 +1730,17 @@ async def canceltemp(ctx):
             continue
 
         if role.managed:
+
             skipped_roles.append(role)
             continue
 
         if role >= ctx.guild.me.top_role:
+
             skipped_roles.append(role)
             continue
 
         if role not in member.roles:
+
             restored_roles.append(role)
 
     if restored_roles:
@@ -2734,16 +3176,6 @@ async def dm_command_error(ctx, error):
 # ============================================================
 # $MASSDM @ROLE MESSAGE
 # ============================================================
-#
-# Example:
-#
-# $massdm @Verified Hello everyone!
-#
-# ONLY members who HAVE the selected role receive
-# the DM.
-#
-# Bots are skipped.
-# ============================================================
 
 @bot.command(name="massdm")
 @commands.has_permissions(administrator=True)
@@ -2772,10 +3204,6 @@ async def massdm_command(
             "❌ Usage: `$massdm @role message`"
         )
 
-    # --------------------------------------------------------
-    # FIND ONLY MEMBERS WITH THE SELECTED ROLE
-    # --------------------------------------------------------
-
     members = [
         member
         for member in ctx.guild.members
@@ -2789,10 +3217,6 @@ async def massdm_command(
             f"❌ No members with {role.mention} were found."
         )
 
-    # --------------------------------------------------------
-    # START MESSAGE
-    # --------------------------------------------------------
-
     await ctx.send(
         f"📨 **Mass DM started.**\n"
         f"🎭 Role: {role.mention}\n"
@@ -2801,10 +3225,6 @@ async def massdm_command(
 
     success = 0
     failed = 0
-
-    # --------------------------------------------------------
-    # SEND DM TO EACH MEMBER
-    # --------------------------------------------------------
 
     for member in members:
 
@@ -2837,12 +3257,7 @@ async def massdm_command(
 
             failed += 1
 
-        # Delay to reduce rate-limit problems.
         await asyncio.sleep(1)
-
-    # --------------------------------------------------------
-    # RESULTS
-    # --------------------------------------------------------
 
     embed = discord.Embed(
         title="📨 Mass DM Finished",
@@ -2939,6 +3354,14 @@ async def help_command(ctx):
             20,
             180
         )
+    )
+
+    embed.add_field(
+        name="📄 Application Commands",
+        value=(
+            "`$trigger @user` — Send a flopping application"
+        ),
+        inline=False
     )
 
     embed.add_field(
@@ -3109,7 +3532,7 @@ async def on_command_error(
 
 
 # ============================================================
-# START BOT
+# READY
 # ============================================================
 
 @bot.event
@@ -3123,6 +3546,11 @@ async def on_ready():
         f"✅ Bot is running in "
         f"{len(bot.guilds)} server(s)"
     )
+
+    print("✅ $trigger application system loaded")
+    print("✅ Accept / Decline buttons loaded")
+    print("✅ Application role system loaded")
+    print("✅ New Flopper system loaded")
 
 
 # ============================================================
