@@ -5,6 +5,7 @@
 import os
 import json
 import re
+import io
 import asyncio
 import datetime
 import discord
@@ -49,6 +50,7 @@ BACKUP_FILE = "server_backup.json"
 # ============================================================
 
 TICKET_CATEGORY_ID = 1541096510102437911
+TRANSCRIPT_CHANNEL_ID = 1541096728806039693
 
 
 # ============================================================
@@ -210,10 +212,6 @@ class ApplicationView(discord.ui.View):
         self.member_id = member_id
         self.finished = False
 
-    # ========================================================
-    # ONLY THE PINGED USER CAN CLICK
-    # ========================================================
-
     async def interaction_check(
         self,
         interaction: discord.Interaction
@@ -229,10 +227,6 @@ class ApplicationView(discord.ui.View):
             return False
 
         return True
-
-    # ========================================================
-    # ACCEPT
-    # ========================================================
 
     @discord.ui.button(
         label="Accept",
@@ -397,10 +391,6 @@ class ApplicationView(discord.ui.View):
             )
         )
 
-    # ========================================================
-    # DECLINE
-    # ========================================================
-
     @discord.ui.button(
         label="Decline",
         emoji="❌",
@@ -468,10 +458,6 @@ class ApplicationView(discord.ui.View):
             embed=embed,
             view=self
         )
-
-    # ========================================================
-    # TIMEOUT
-    # ========================================================
 
     async def on_timeout(self):
 
@@ -1216,7 +1202,7 @@ async def demo_error(ctx, error):
         commands.MissingRequiredArgument
     ):
 
-        await ctx.send(
+        return await ctx.send(
             "❌ Usage: `$demo @user`"
         )
 
@@ -1225,7 +1211,7 @@ async def demo_error(ctx, error):
         commands.BadArgument
     ):
 
-        await ctx.send(
+        return await ctx.send(
             "❌ Please mention a valid member."
         )
 
@@ -2391,21 +2377,11 @@ def is_ticket_channel(channel):
 
         return False
 
-    # --------------------------------------------------------
-    # PRIMARY CHECK:
-    # TICKET CATEGORY
-    # --------------------------------------------------------
-
     if TICKET_CATEGORY_ID:
 
         if channel.category_id == TICKET_CATEGORY_ID:
 
             return True
-
-    # --------------------------------------------------------
-    # FALLBACK:
-    # TICKET CHANNEL NAME
-    # --------------------------------------------------------
 
     name = channel.name.lower()
 
@@ -2418,22 +2394,10 @@ def is_ticket_channel(channel):
 
 def get_ticket_data(channel):
 
-    """
-    Reads:
-
-    owner=123456789;claimed=987654321
-
-    claimed=0 means unclaimed.
-    """
-
     owner_id = 0
     claimed_id = 0
 
     topic = channel.topic or ""
-
-    # --------------------------------------------------------
-    # OWNER
-    # --------------------------------------------------------
 
     owner_match = re.search(
         r"(?:^|;)owner=(\d+)",
@@ -2454,10 +2418,6 @@ def get_ticket_data(channel):
         ):
 
             owner_id = 0
-
-    # --------------------------------------------------------
-    # CLAIMED
-    # --------------------------------------------------------
 
     claimed_match = re.search(
         r"(?:^|;)claimed=(\d+)",
@@ -2575,10 +2535,6 @@ async def claim(ctx):
                 "❌ This command can only be used inside a server."
             )
 
-        # ----------------------------------------------------
-        # BOT PERMISSION
-        # ----------------------------------------------------
-
         bot_member = guild.me
 
         if bot_member is None:
@@ -2601,17 +2557,9 @@ async def claim(ctx):
                     "❌ I need the **Manage Channels** permission."
                 )
 
-        # ----------------------------------------------------
-        # GET TICKET DATA
-        # ----------------------------------------------------
-
         owner_id, claimed_id = get_ticket_data(
             ctx.channel
         )
-
-        # ----------------------------------------------------
-        # ALREADY CLAIMED
-        # ----------------------------------------------------
 
         if claimed_id != 0:
 
@@ -2630,17 +2578,9 @@ async def claim(ctx):
                 "❌ This ticket is already claimed."
             )
 
-        # ----------------------------------------------------
-        # MIDDLEMAN ROLE
-        # ----------------------------------------------------
-
         middleman_role = get_middleman_role(
             guild
         )
-
-        # ----------------------------------------------------
-        # SAVE CLAIM
-        # ----------------------------------------------------
 
         await save_ticket_data(
             ctx.channel,
@@ -2648,10 +2588,6 @@ async def claim(ctx):
             ctx.author.id,
             reason=f"Ticket claimed by {ctx.author}"
         )
-
-        # ----------------------------------------------------
-        # HIDE FROM MIDDLEMEN
-        # ----------------------------------------------------
 
         if middleman_role:
 
@@ -2671,10 +2607,6 @@ async def claim(ctx):
                     "Check my **Manage Channels** permission."
                 )
 
-        # ----------------------------------------------------
-        # GIVE CLAIMER ACCESS
-        # ----------------------------------------------------
-
         try:
 
             await ctx.channel.set_permissions(
@@ -2690,10 +2622,6 @@ async def claim(ctx):
             return await ctx.send(
                 "❌ I couldn't give you access to this ticket."
             )
-
-        # ----------------------------------------------------
-        # EMBED
-        # ----------------------------------------------------
 
         embed = discord.Embed(
             title="🎫 Ticket Claimed",
@@ -2794,10 +2722,6 @@ async def unclaim(ctx):
                 "❌ This command can only be used inside a server."
             )
 
-        # ----------------------------------------------------
-        # GET DATA
-        # ----------------------------------------------------
-
         owner_id, claimed_id = get_ticket_data(
             ctx.channel
         )
@@ -2808,17 +2732,9 @@ async def unclaim(ctx):
                 "❌ This ticket is not claimed."
             )
 
-        # ----------------------------------------------------
-        # MIDDLEMAN ROLE
-        # ----------------------------------------------------
-
         middleman_role = get_middleman_role(
             guild
         )
-
-        # ----------------------------------------------------
-        # CLEAR CLAIM
-        # ----------------------------------------------------
 
         await save_ticket_data(
             ctx.channel,
@@ -2826,10 +2742,6 @@ async def unclaim(ctx):
             0,
             reason=f"Ticket unclaimed by {ctx.author}"
         )
-
-        # ----------------------------------------------------
-        # RESTORE MIDDLEMAN ACCESS
-        # ----------------------------------------------------
 
         if middleman_role:
 
@@ -2850,10 +2762,6 @@ async def unclaim(ctx):
                     "Middleman role."
                 )
 
-        # ----------------------------------------------------
-        # REMOVE OLD CLAIMER
-        # ----------------------------------------------------
-
         claimed_member = guild.get_member(
             claimed_id
         )
@@ -2871,10 +2779,6 @@ async def unclaim(ctx):
             except discord.Forbidden:
 
                 pass
-
-        # ----------------------------------------------------
-        # EMBED
-        # ----------------------------------------------------
 
         embed = discord.Embed(
             title="🔓 Ticket Unclaimed",
@@ -2972,10 +2876,6 @@ async def transferticket(
                 "❌ This command can only be used inside a server."
             )
 
-        # ----------------------------------------------------
-        # FIND USER
-        # ----------------------------------------------------
-
         member = await get_member_from_input(
             ctx,
             user_input
@@ -2997,17 +2897,9 @@ async def transferticket(
                 "❌ You cannot transfer a ticket to a bot."
             )
 
-        # ----------------------------------------------------
-        # CURRENT DATA
-        # ----------------------------------------------------
-
         owner_id, claimed_id = get_ticket_data(
             ctx.channel
         )
-
-        # ----------------------------------------------------
-        # REMOVE OLD CLAIMER
-        # ----------------------------------------------------
 
         if (
             claimed_id != 0
@@ -3032,10 +2924,6 @@ async def transferticket(
 
                     pass
 
-        # ----------------------------------------------------
-        # MIDDLEMAN ROLE
-        # ----------------------------------------------------
-
         middleman_role = get_middleman_role(
             guild
         )
@@ -3057,10 +2945,6 @@ async def transferticket(
                     "permissions."
                 )
 
-        # ----------------------------------------------------
-        # GIVE NEW USER ACCESS
-        # ----------------------------------------------------
-
         try:
 
             await ctx.channel.set_permissions(
@@ -3078,10 +2962,6 @@ async def transferticket(
                 "to this ticket."
             )
 
-        # ----------------------------------------------------
-        # SAVE NEW CLAIM
-        # ----------------------------------------------------
-
         await save_ticket_data(
             ctx.channel,
             owner_id,
@@ -3091,10 +2971,6 @@ async def transferticket(
                 f"{ctx.author} to {member}"
             )
         )
-
-        # ----------------------------------------------------
-        # EMBED
-        # ----------------------------------------------------
 
         embed = discord.Embed(
             title="🔄 Ticket Transferred",
@@ -3212,10 +3088,6 @@ async def add_user(
                 "❌ This command can only be used inside a server."
             )
 
-        # ----------------------------------------------------
-        # FIND MEMBER
-        # ----------------------------------------------------
-
         member = await get_member_from_input(
             ctx,
             user_input
@@ -3237,10 +3109,6 @@ async def add_user(
                 "❌ You cannot add a bot to the ticket."
             )
 
-        # ----------------------------------------------------
-        # CHECK CURRENT ACCESS
-        # ----------------------------------------------------
-
         permissions = ctx.channel.permissions_for(
             member
         )
@@ -3251,10 +3119,6 @@ async def add_user(
                 f"❌ {member.mention} already has access "
                 f"to this ticket."
             )
-
-        # ----------------------------------------------------
-        # ADD USER
-        # ----------------------------------------------------
 
         try:
 
@@ -3272,10 +3136,6 @@ async def add_user(
                 "❌ I need **Manage Channels** permission "
                 "to add people to tickets."
             )
-
-        # ----------------------------------------------------
-        # EMBED
-        # ----------------------------------------------------
 
         embed = discord.Embed(
             title="👤 Member Added",
@@ -3371,19 +3231,42 @@ async def close_ticket(ctx):
         # TICKET CHECK
         # ----------------------------------------------------
 
-        if not is_ticket_channel(
-            ctx.channel
-        ):
+        if not is_ticket_channel(ctx.channel):
 
             return await ctx.send(
                 "❌ This command can only be used in a ticket."
             )
 
+        guild = ctx.guild
+        channel = ctx.channel
+
+        if guild is None:
+
+            return await ctx.send(
+                "❌ This command can only be used inside a server."
+            )
+
+        channel_name = channel.name
+
         # ----------------------------------------------------
-        # CHANNEL NAME
+        # GET TICKET DATA
         # ----------------------------------------------------
 
-        channel_name = ctx.channel.name
+        owner_id, claimed_id = get_ticket_data(
+            channel
+        )
+
+        owner = (
+            guild.get_member(owner_id)
+            if owner_id
+            else None
+        )
+
+        claimed_by = (
+            guild.get_member(claimed_id)
+            if claimed_id
+            else None
+        )
 
         # ----------------------------------------------------
         # CLOSING EMBED
@@ -3394,6 +3277,7 @@ async def close_ticket(ctx):
             description=(
                 f"This ticket is being closed by "
                 f"{ctx.author.mention}.\n\n"
+                "📄 Creating transcript...\n"
                 "The channel will be deleted in **5 seconds**."
             ),
             color=discord.Color.from_rgb(
@@ -3410,28 +3294,343 @@ async def close_ticket(ctx):
         )
 
         embed.add_field(
+            name="👤 Ticket Owner",
+            value=(
+                owner.mention
+                if owner
+                else f"Unknown (`{owner_id}`)"
+            ),
+            inline=False
+        )
+
+        embed.add_field(
             name="👮 Closed By",
             value=ctx.author.mention,
             inline=False
         )
+
+        if claimed_by:
+
+            embed.add_field(
+                name="🔒 Claimed By",
+                value=claimed_by.mention,
+                inline=False
+            )
 
         await ctx.send(
             embed=embed
         )
 
         # ----------------------------------------------------
-        # WAIT
+        # CREATE TRANSCRIPT
+        # ----------------------------------------------------
+
+        transcript_lines = []
+
+        transcript_lines.append(
+            "=" * 80
+        )
+
+        transcript_lines.append(
+            f"TICKET TRANSCRIPT: {channel_name}"
+        )
+
+        transcript_lines.append(
+            f"Server: {guild.name} ({guild.id})"
+        )
+
+        transcript_lines.append(
+            f"Channel ID: {channel.id}"
+        )
+
+        if owner:
+
+            transcript_lines.append(
+                f"Ticket Owner: {owner} ({owner.id})"
+            )
+
+        else:
+
+            transcript_lines.append(
+                f"Ticket Owner ID: {owner_id}"
+            )
+
+        if claimed_by:
+
+            transcript_lines.append(
+                f"Claimed By: {claimed_by} ({claimed_by.id})"
+            )
+
+        else:
+
+            transcript_lines.append(
+                "Claimed By: Nobody"
+            )
+
+        transcript_lines.append(
+            f"Closed By: {ctx.author} ({ctx.author.id})"
+        )
+
+        transcript_lines.append(
+            "Closed At: "
+            + datetime.datetime.now(
+                datetime.timezone.utc
+            ).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+        )
+
+        transcript_lines.append(
+            "=" * 80
+        )
+
+        transcript_lines.append("")
+
+        message_count = 0
+
+        # ----------------------------------------------------
+        # READ EVERY MESSAGE
+        # ----------------------------------------------------
+
+        async for message in channel.history(
+            limit=None,
+            oldest_first=True
+        ):
+
+            message_count += 1
+
+            timestamp = message.created_at.strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+
+            transcript_lines.append(
+                f"[{timestamp}] "
+                f"{message.author} "
+                f"(ID: {message.author.id})"
+            )
+
+            # ------------------------------------------------
+            # MESSAGE CONTENT
+            # ------------------------------------------------
+
+            if message.content:
+
+                transcript_lines.append(
+                    message.content
+                )
+
+            else:
+
+                transcript_lines.append(
+                    "[No text content]"
+                )
+
+            # ------------------------------------------------
+            # ATTACHMENTS
+            # ------------------------------------------------
+
+            if message.attachments:
+
+                transcript_lines.append(
+                    "Attachments:"
+                )
+
+                for attachment in message.attachments:
+
+                    transcript_lines.append(
+                        f"- {attachment.filename}: "
+                        f"{attachment.url}"
+                    )
+
+            # ------------------------------------------------
+            # EMBEDS
+            # ------------------------------------------------
+
+            if message.embeds:
+
+                transcript_lines.append(
+                    f"[{len(message.embeds)} embed(s)]"
+                )
+
+                for message_embed in message.embeds:
+
+                    if message_embed.title:
+
+                        transcript_lines.append(
+                            f"Embed Title: "
+                            f"{message_embed.title}"
+                        )
+
+                    if message_embed.description:
+
+                        transcript_lines.append(
+                            f"Embed Description: "
+                            f"{message_embed.description}"
+                        )
+
+            # ------------------------------------------------
+            # REPLIES
+            # ------------------------------------------------
+
+            if message.reference:
+
+                if message.reference.message_id:
+
+                    transcript_lines.append(
+                        "Replying to message ID: "
+                        f"{message.reference.message_id}"
+                    )
+
+            transcript_lines.append(
+                "-" * 80
+            )
+
+        # ----------------------------------------------------
+        # CREATE TXT FILE
+        # ----------------------------------------------------
+
+        transcript_text = "\n".join(
+            transcript_lines
+        )
+
+        transcript_bytes = io.BytesIO(
+            transcript_text.encode("utf-8")
+        )
+
+        transcript_bytes.seek(0)
+
+        transcript_file = discord.File(
+            transcript_bytes,
+            filename=f"{channel_name}-transcript.txt"
+        )
+
+        # ----------------------------------------------------
+        # TRANSCRIPT CHANNEL
+        # ----------------------------------------------------
+
+        transcript_channel = guild.get_channel(
+            TRANSCRIPT_CHANNEL_ID
+        )
+
+        if transcript_channel is None:
+
+            print(
+                "❌ Transcript channel not found: "
+                f"{TRANSCRIPT_CHANNEL_ID}"
+            )
+
+        else:
+
+            transcript_embed = discord.Embed(
+                title="📄 Ticket Transcript",
+                description=(
+                    f"Transcript saved for "
+                    f"**{channel_name}**."
+                ),
+                color=discord.Color.from_rgb(
+                    255,
+                    20,
+                    180
+                ),
+                timestamp=datetime.datetime.now(
+                    datetime.timezone.utc
+                )
+            )
+
+            transcript_embed.add_field(
+                name="🎫 Ticket",
+                value=f"`{channel_name}`",
+                inline=True
+            )
+
+            transcript_embed.add_field(
+                name="👤 Owner",
+                value=(
+                    owner.mention
+                    if owner
+                    else "Unknown"
+                ),
+                inline=True
+            )
+
+            transcript_embed.add_field(
+                name="👮 Closed By",
+                value=ctx.author.mention,
+                inline=True
+            )
+
+            transcript_embed.add_field(
+                name="💬 Messages",
+                value=str(message_count),
+                inline=True
+            )
+
+            transcript_embed.add_field(
+                name="📂 Channel ID",
+                value=str(channel.id),
+                inline=True
+            )
+
+            if claimed_by:
+
+                transcript_embed.add_field(
+                    name="🔒 Claimed By",
+                    value=claimed_by.mention,
+                    inline=True
+                )
+
+            else:
+
+                transcript_embed.add_field(
+                    name="🔓 Status",
+                    value="Unclaimed",
+                    inline=True
+                )
+
+            transcript_embed.set_footer(
+                text=(
+                    "Minstrea ~ MM service • "
+                    "Ticket Transcript"
+                )
+            )
+
+            try:
+
+                await transcript_channel.send(
+                    embed=transcript_embed,
+                    file=transcript_file
+                )
+
+                print(
+                    f"✅ Transcript saved for #{channel_name}"
+                )
+
+            except discord.Forbidden:
+
+                print(
+                    "❌ I don't have permission to send "
+                    "the transcript."
+                )
+
+            except discord.HTTPException as error:
+
+                print(
+                    f"❌ Transcript upload failed: {error}"
+                )
+
+        # ----------------------------------------------------
+        # WAIT 5 SECONDS
         # ----------------------------------------------------
 
         await asyncio.sleep(5)
 
         # ----------------------------------------------------
-        # DELETE
+        # DELETE TICKET
         # ----------------------------------------------------
 
         try:
 
-            await ctx.channel.delete(
+            await channel.delete(
                 reason=f"Ticket closed by {ctx.author}"
             )
 
@@ -3451,6 +3650,12 @@ async def close_ticket(ctx):
             except Exception:
 
                 pass
+
+        except discord.HTTPException as error:
+
+            print(
+                f"❌ Failed to delete ticket: {error}"
+            )
 
     except (
         discord.Forbidden,
@@ -4211,7 +4416,7 @@ async def help_command(ctx):
             "`$unclaim` — Unclaim current ticket\n"
             "`$transferticket @user / ID` — Transfer ticket\n"
             "`$add @user / ID` — Add member to ticket\n"
-            "`$close` — Close and delete current ticket\n"
+            "`$close` — Save transcript and close ticket\n"
             "`$transferroles @user` — Transfer roles"
         ),
         inline=False
@@ -4389,6 +4594,10 @@ async def on_ready():
 
     print(
         "✅ $close loaded"
+    )
+
+    print(
+        f"✅ Transcript channel: {TRANSCRIPT_CHANNEL_ID}"
     )
 
 
