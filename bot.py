@@ -4837,7 +4837,7 @@ async def on_message_delete(message):
         deleted_message
     )
 
-    # Keep only the newest 20 messages
+    # Keep maximum 100 messages
     snipe_messages[channel_id] = (
         snipe_messages[channel_id][:MAX_SNIPE_MESSAGES]
     )
@@ -4853,41 +4853,66 @@ async def snipe(ctx, number: int = 1):
 
     channel_id = ctx.channel.id
 
-    # No deleted messages
+    # --------------------------------------------------------
+    # NO SNIPES
+    # --------------------------------------------------------
+
     if (
         channel_id not in snipe_messages
         or not snipe_messages[channel_id]
     ):
+
         await ctx.send(
             "❌ There are no deleted messages to snipe."
         )
+
         return
 
-    # Number must be 1+
+    # --------------------------------------------------------
+    # INVALID NUMBER
+    # --------------------------------------------------------
+
     if number < 1:
+
         await ctx.send(
             "❌ The number must be **1 or higher**."
         )
+
         return
 
     messages = snipe_messages[channel_id]
 
-    # Number doesn't exist
     if number > len(messages):
+
         await ctx.send(
             f"❌ There are only **{len(messages)}** "
             "deleted messages available."
         )
+
         return
 
     deleted = messages[number - 1]
 
-    # ========================================================
-    # EMBED
-    # ========================================================
+    author = deleted["author"]
+    content = deleted["content"]
+
+    # --------------------------------------------------------
+    # MESSAGE CONTENT
+    # --------------------------------------------------------
+
+    if not content:
+        content = "*No text content*"
+
+    # Discord embed field/value limit protection
+    if len(content) > 4000:
+        content = content[:3997] + "..."
+
+    # --------------------------------------------------------
+    # CREATE EMBED
+    # --------------------------------------------------------
 
     embed = discord.Embed(
-        title="🕵️ Deleted Message",
+        description=content,
         color=discord.Color.from_rgb(
             255,
             105,
@@ -4895,57 +4920,37 @@ async def snipe(ctx, number: int = 1):
         )
     )
 
-    # Author
+    # --------------------------------------------------------
+    # AUTHOR
+    # --------------------------------------------------------
+
     embed.set_author(
-        name=deleted["author"].display_name,
-        icon_url=deleted["author"].display_avatar.url
+        name=author.display_name,
+        icon_url=author.display_avatar.url
     )
 
-    # Message content
-    content = deleted["content"]
-
-    if not content:
-        content = "*No text content*"
+    # --------------------------------------------------------
+    # DELETED MESSAGE TIMELINE
+    # --------------------------------------------------------
 
     embed.add_field(
-        name="Message",
-        value=content[:1024],
+        name="Deleted Message Timeline",
+        value=(
+            f"Sent originally: "
+            f"<t:{int(deleted['created_at'].timestamp())}:R>"
+        ),
         inline=False
     )
 
-    # Author
-    embed.add_field(
-        name="Author",
-        value=deleted["author"].mention,
-        inline=True
-    )
-
-    # Channel
-    embed.add_field(
-        name="Channel",
-        value=ctx.channel.mention,
-        inline=True
-    )
-
-    # ========================================================
-    # ATTACHMENTS
-    # ========================================================
+    # --------------------------------------------------------
+    # ATTACHMENT
+    # --------------------------------------------------------
 
     if deleted["attachments"]:
 
-        attachment_text = "\n".join(
-            deleted["attachments"]
-        )
-
-        embed.add_field(
-            name="Attachments",
-            value=attachment_text[:1024],
-            inline=False
-        )
-
-        # Display first image attachment
         first_attachment = deleted["attachments"][0]
 
+        # Show image as thumbnail like the Roblox Trade Helper
         if any(
             first_attachment.lower().endswith(ext)
             for ext in [
@@ -4957,17 +4962,32 @@ async def snipe(ctx, number: int = 1):
             ]
         ):
 
-            embed.set_image(
+            embed.set_thumbnail(
                 url=first_attachment
             )
 
-    # ========================================================
+        else:
+
+            embed.add_field(
+                name="Attachment",
+                value=first_attachment[:1024],
+                inline=False
+            )
+
+    # --------------------------------------------------------
     # FOOTER
-    # ========================================================
+    # --------------------------------------------------------
 
     embed.set_footer(
-        text=f"Snipe #{number}"
+        text=(
+            f"{ctx.channel.name} • "
+            f"Snipe Record {number}/{len(messages)}"
+        )
     )
+
+    # --------------------------------------------------------
+    # SEND
+    # --------------------------------------------------------
 
     await ctx.send(
         embed=embed
@@ -4984,22 +5004,38 @@ async def clearsnipe(ctx):
 
     channel_id = ctx.channel.id
 
-    # Nothing to clear
+    # --------------------------------------------------------
+    # NOTHING TO CLEAR
+    # --------------------------------------------------------
+
     if (
         channel_id not in snipe_messages
         or not snipe_messages[channel_id]
     ):
+
         await ctx.send(
             "⚠️ There are no deleted messages to clear."
         )
+
         return
+
+    # --------------------------------------------------------
+    # COUNT
+    # --------------------------------------------------------
 
     cleared = len(
         snipe_messages[channel_id]
     )
 
-    # Clear this channel's snipes
+    # --------------------------------------------------------
+    # CLEAR
+    # --------------------------------------------------------
+
     snipe_messages[channel_id].clear()
+
+    # --------------------------------------------------------
+    # CONFIRM
+    # --------------------------------------------------------
 
     await ctx.send(
         f"🗑️ Cleared **{cleared}** "
