@@ -4588,7 +4588,6 @@ async def help_command(ctx):
             "`$ban @user / ID` — Ban a member\n"
             "`$unban (user ID)` — Unban a member\n"
             "`$kick @user / ID` — Kick a member\n"
-            "`$purge (number)` — Delete messages"
         ),
         inline=False
     )
@@ -4624,6 +4623,17 @@ async def help_command(ctx):
         inline=False
     )
 
+    embed.add_field(
+    name="🛠️ Manage Messages",
+    value=(
+        "`$snipe` — View the latest deleted message\n"
+        "`$snipe <number>` — View a specific deleted message\n"
+        "`$clearsnipe` — Clear deleted message history\n"
+        "`$purge <number>` — Delete multiple messages"
+    ),
+    inline=False
+)
+    
     if ctx.guild.icon:
 
         embed.set_thumbnail(
