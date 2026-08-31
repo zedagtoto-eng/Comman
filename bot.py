@@ -4786,6 +4786,262 @@ async def on_ready():
 
 
 # ============================================================
+# SNIPE SYSTEM
+# ============================================================
+
+MAX_SNIPE_MESSAGES = 100
+
+# Stores deleted messages separately for each channel
+snipe_messages = {}
+
+
+# ============================================================
+# TRACK DELETED MESSAGES
+# ============================================================
+
+@bot.event
+async def on_message_delete(message):
+
+    # Ignore bot messages
+    if message.author.bot:
+        return
+
+    channel_id = message.channel.id
+
+    if channel_id not in snipe_messages:
+        snipe_messages[channel_id] = []
+
+    deleted_message = {
+        "author": message.author,
+        "content": message.content,
+        "attachments": [
+            attachment.url
+            for attachment in message.attachments
+        ],
+        "created_at": message.created_at
+    }
+
+    # Put newest deleted message first
+    snipe_messages[channel_id].insert(
+        0,
+        deleted_message
+    )
+
+    # Keep only the newest 20 messages
+    snipe_messages[channel_id] = (
+        snipe_messages[channel_id][:MAX_SNIPE_MESSAGES]
+    )
+
+
+# ============================================================
+# $SNIPE / $SNIPE (NUMBER)
+# ============================================================
+
+@bot.command(name="snipe")
+@commands.has_permissions(manage_messages=True)
+async def snipe(ctx, number: int = 1):
+
+    channel_id = ctx.channel.id
+
+    # No deleted messages
+    if (
+        channel_id not in snipe_messages
+        or not snipe_messages[channel_id]
+    ):
+        await ctx.send(
+            "❌ There are no deleted messages to snipe."
+        )
+        return
+
+    # Number must be 1+
+    if number < 1:
+        await ctx.send(
+            "❌ The number must be **1 or higher**."
+        )
+        return
+
+    messages = snipe_messages[channel_id]
+
+    # Number doesn't exist
+    if number > len(messages):
+        await ctx.send(
+            f"❌ There are only **{len(messages)}** "
+            "deleted messages available."
+        )
+        return
+
+    deleted = messages[number - 1]
+
+    # ========================================================
+    # EMBED
+    # ========================================================
+
+    embed = discord.Embed(
+        title="🕵️ Deleted Message",
+        color=discord.Color.from_rgb(
+            255,
+            105,
+            180
+        )
+    )
+
+    # Author
+    embed.set_author(
+        name=deleted["author"].display_name,
+        icon_url=deleted["author"].display_avatar.url
+    )
+
+    # Message content
+    content = deleted["content"]
+
+    if not content:
+        content = "*No text content*"
+
+    embed.add_field(
+        name="Message",
+        value=content[:1024],
+        inline=False
+    )
+
+    # Author
+    embed.add_field(
+        name="Author",
+        value=deleted["author"].mention,
+        inline=True
+    )
+
+    # Channel
+    embed.add_field(
+        name="Channel",
+        value=ctx.channel.mention,
+        inline=True
+    )
+
+    # ========================================================
+    # ATTACHMENTS
+    # ========================================================
+
+    if deleted["attachments"]:
+
+        attachment_text = "\n".join(
+            deleted["attachments"]
+        )
+
+        embed.add_field(
+            name="Attachments",
+            value=attachment_text[:1024],
+            inline=False
+        )
+
+        # Display first image attachment
+        first_attachment = deleted["attachments"][0]
+
+        if any(
+            first_attachment.lower().endswith(ext)
+            for ext in [
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".webp"
+            ]
+        ):
+
+            embed.set_image(
+                url=first_attachment
+            )
+
+    # ========================================================
+    # FOOTER
+    # ========================================================
+
+    embed.set_footer(
+        text=f"Snipe #{number}"
+    )
+
+    await ctx.send(
+        embed=embed
+    )
+
+
+# ============================================================
+# $CLEARSNIPE
+# ============================================================
+
+@bot.command(name="clearsnipe")
+@commands.has_permissions(manage_messages=True)
+async def clearsnipe(ctx):
+
+    channel_id = ctx.channel.id
+
+    # Nothing to clear
+    if (
+        channel_id not in snipe_messages
+        or not snipe_messages[channel_id]
+    ):
+        await ctx.send(
+            "⚠️ There are no deleted messages to clear."
+        )
+        return
+
+    cleared = len(
+        snipe_messages[channel_id]
+    )
+
+    # Clear this channel's snipes
+    snipe_messages[channel_id].clear()
+
+    await ctx.send(
+        f"🗑️ Cleared **{cleared}** "
+        "sniped message(s) from this channel."
+    )
+
+
+# ============================================================
+# SNIPE ERROR HANDLER
+# ============================================================
+
+@snipe.error
+async def snipe_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        await ctx.send(
+            "❌ You need **Manage Messages** permission "
+            "to use `$snipe`."
+        )
+
+    elif isinstance(
+        error,
+        commands.BadArgument
+    ):
+
+        await ctx.send(
+            "❌ Usage: `$snipe` or `$snipe <number>`"
+        )
+
+
+# ============================================================
+# CLEARSNIPE ERROR HANDLER
+# ============================================================
+
+@clearsnipe.error
+async def clearsnipe_error(ctx, error):
+
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
+        await ctx.send(
+            "❌ You need **Manage Messages** permission "
+            "to use `$clearsnipe`."
+        )
+
+# ============================================================
 # RUN BOT
 # ============================================================
 
