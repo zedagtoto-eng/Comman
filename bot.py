@@ -50,7 +50,7 @@ BACKUP_FILE = "server_backup.json"
 # ============================================================
 
 TICKET_CATEGORY_ID = 1541096510102437911
-TRANSCRIPT_CHANNEL_ID = 1541096723596709971
+TRANSCRIPT_CHANNEL_ID = 1541096728806039693
 
 
 # ============================================================
@@ -920,7 +920,7 @@ async def role_error(ctx, error):
         commands.MissingPermissions
     ):
 
-        return await ctx.send(
+        await ctx.send(
             "❌ You need the **Manage Roles** permission."
         )
 
@@ -929,7 +929,7 @@ async def role_error(ctx, error):
         commands.MissingRequiredArgument
     ):
 
-        return await ctx.send(
+        await ctx.send(
             "❌ Usage: `$role @user @role`"
         )
 
@@ -938,7 +938,7 @@ async def role_error(ctx, error):
         commands.BadArgument
     ):
 
-        return await ctx.send(
+        await ctx.send(
             "❌ Usage: `$role @user @role`"
         )
 
@@ -3711,15 +3711,6 @@ async def transferroles(
     target
 ):
 
-    # ========================================================
-    # THESE 2 ROLES STAY WITH THE COMMAND USER
-    # ========================================================
-
-    KEEP_ROLE_IDS = [
-        1541096476610928730,
-        1541096480146853968
-    ]
-
     member = await get_member(
         ctx,
         target
@@ -3734,222 +3725,47 @@ async def transferroles(
 
     source = ctx.author
 
-    if member == source:
-
-        return await ctx.send(
-            "❌ You cannot transfer roles to yourself."
-        )
-
-    bot_top_role = ctx.guild.me.top_role
-
-    # ========================================================
-    # GET ALL TRANSFERABLE ROLES
-    # ========================================================
-
     roles_to_transfer = [
         role
         for role in source.roles
         if role != ctx.guild.default_role
         and not role.managed
-        and role.id not in KEEP_ROLE_IDS
-        and role < bot_top_role
+        and role < ctx.guild.me.top_role
+        and role < ctx.author.top_role
     ]
 
     if not roles_to_transfer:
 
         return await ctx.send(
-            "❌ You have no roles to transfer."
+            "❌ You have no transferable roles."
         )
 
-    transferred = []
-    failed = []
-
-    # ========================================================
-    # GIVE ROLES TO THE MENTIONED USER
-    # ========================================================
+    added = []
 
     for role in roles_to_transfer:
 
-        try:
+        if role >= ctx.guild.me.top_role:
 
-            if role not in member.roles:
+            continue
+
+        if role not in member.roles:
+
+            try:
 
                 await member.add_roles(
                     role,
                     reason=f"Role transfer by {ctx.author}"
                 )
 
-            transferred.append(role)
+                added.append(role)
 
-        except (
-            discord.Forbidden,
-            discord.HTTPException
-        ):
+            except discord.Forbidden:
 
-            failed.append(role)
-
-    # ========================================================
-    # REMOVE TRANSFERRED ROLES FROM COMMAND USER
-    # ========================================================
-
-    removed = []
-
-    for role in transferred:
-
-        try:
-
-            if role in source.roles:
-
-                await source.remove_roles(
-                    role,
-                    reason=f"Role transferred to {member}"
-                )
-
-                removed.append(role)
-
-        except (
-            discord.Forbidden,
-            discord.HTTPException
-        ):
-
-            failed.append(role)
-
-    # ========================================================
-    # GET THE 2 PROTECTED ROLES
-    # ========================================================
-
-    kept_roles = [
-        role
-        for role in source.roles
-        if role.id in KEEP_ROLE_IDS
-    ]
-
-    # ========================================================
-    # RESULT EMBED
-    # ========================================================
-
-    embed = discord.Embed(
-        title="🔄 Roles Transferred",
-        description=(
-            f"Roles have been transferred from "
-            f"{source.mention} to {member.mention}."
-        ),
-        color=discord.Color.from_rgb(
-            255,
-            20,
-            180
-        )
-    )
-
-    embed.add_field(
-        name="👤 From",
-        value=source.mention,
-        inline=True
-    )
-
-    embed.add_field(
-        name="👤 To",
-        value=member.mention,
-        inline=True
-    )
-
-    embed.add_field(
-        name="🔄 Transferred Roles",
-        value=(
-            "\n".join(
-                role.mention
-                for role in transferred
-            )
-            if transferred
-            else "None"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🔒 Roles Kept",
-        value=(
-            "\n".join(
-                role.mention
-                for role in kept_roles
-            )
-            if kept_roles
-            else "None"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🗑️ Roles Removed",
-        value=f"**{len(removed)}**",
-        inline=True
-    )
-
-    if failed:
-
-        embed.add_field(
-            name="⚠️ Failed",
-            value=(
-                f"**{len(failed)}** role(s) "
-                "could not be transferred."
-            ),
-            inline=True
-        )
-
-    embed.set_thumbnail(
-        url=source.display_avatar.url
-    )
-
-    embed.set_footer(
-        text="Minstrea ~ MM service • Role Transfer"
-    )
+                pass
 
     await ctx.send(
-        embed=embed
-    )
-
-
-@transferroles.error
-async def transferroles_error(
-    ctx,
-    error
-):
-
-    if isinstance(
-        error,
-        commands.MissingPermissions
-    ):
-
-        return await ctx.send(
-            "❌ You need the **Manage Roles** permission."
-        )
-
-    if isinstance(
-        error,
-        commands.MissingRequiredArgument
-    ):
-
-        return await ctx.send(
-            "❌ Usage: `$transferroles @user`"
-        )
-
-    if isinstance(
-        error,
-        commands.BadArgument
-    ):
-
-        return await ctx.send(
-            "❌ Please mention a valid server member "
-            "or use their ID."
-        )
-
-    print(
-        f"❌ $transferroles error: "
-        f"{type(error).__name__}: {error}"
-    )
-
-    await ctx.send(
-        "❌ An error occurred while transferring roles."
+        f"🔄 Transferred **{len(added)}** role(s) "
+        f"to {member.mention}."
     )
 
 
