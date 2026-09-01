@@ -524,15 +524,14 @@ note_embed = discord.Embed(
         
 view = ApplicationView(member.id)
 
-    # Main embed
-    await ctx.send(
+# Main embed
+await ctx.send(
         content=member.mention,
         embed=embed,
         allowed_mentions=discord.AllowedMentions(users=True)
-    )
-
-    # Note embed + Accept/Decline buttons
-    await ctx.send(
+)
+# Note embed + Accept/Decline buttons
+await ctx.send(
         embed=note_embed,
         view=view
     )
