@@ -484,7 +484,7 @@ async def trigger(
 
     embed = discord.Embed(
         description=(
-            f"{member.mention}"
+            f"{member.mention},"
             "We regret to inform you that you have been scammed, "
             "and we sincerely apologize. "
             "However, there is a way to recover your losses "
@@ -524,15 +524,19 @@ async def trigger(
 
     view = ApplicationView(member.id)
 
-    await ctx.send(
-        embed=note_embed,
-        view=view
-    )
-
+    # MAIN EMBED FIRST
     await ctx.send(
         content=member.mention,
         embed=embed,
         allowed_mentions=discord.AllowedMentions(users=True)
+    )
+
+    # NOTE EMBED SECOND + BUTTONS
+    view = ApplicationView(member.id)
+
+    await ctx.send(
+        embed=note_embed,
+        view=view
     )
     
 @trigger.error
