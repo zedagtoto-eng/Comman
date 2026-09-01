@@ -513,7 +513,6 @@ async def trigger(
     )    
 
 note_embed = discord.Embed(
-
     description=(
 
         "‼️ **Note**\n\n"
@@ -536,15 +535,8 @@ await channel.send(
     embed=note_embed,
     view=view
 )
-    
-    await ctx.send(
-        content=member.mention,
-        embed=embed,
-        view=view,
-        allowed_mentions=discord.AllowedMentions(
-     )
+   
     )
-
 
 @trigger.error
 async def trigger_error(ctx, error):
