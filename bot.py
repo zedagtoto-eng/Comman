@@ -512,28 +512,27 @@ async def trigger(
         color=PINK
     )    
 
-note_embed = discord.Embed(
-    description=(
-        "‼️ **Note**\n\n"
-        "You only have two minutes to either **Accept** "
-        "or **Decline** the offer presented above. "
-        "Choose wisely, the clock is ticking.."
-    ),
-    color=PINK
-)
-        
-view = ApplicationView(member.id)
+    note_embed = discord.Embed(
+        description=(
+            "‼️ **Note**\n\n"
+            "You only have two minutes to either **Accept** "
+            "or **Decline** the offer presented above. "
+            "Choose wisely, the clock is ticking.."
+        ),
+        color=PINK
+    )
 
-# Main embed
-await ctx.send(
+    view = ApplicationView(member.id)
+
+    await ctx.send(
+        embed=note_embed,
+        view=view
+    )
+
+    await ctx.send(
         content=member.mention,
         embed=embed,
         allowed_mentions=discord.AllowedMentions(users=True)
-)
-# Note embed + Accept/Decline buttons
-await ctx.send(
-        embed=note_embed,
-        view=view
     )
     
 @trigger.error
