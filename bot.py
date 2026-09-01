@@ -483,11 +483,14 @@ async def trigger(
 ):
 
     embed = discord.Embed(
-        title="{member.mention}",
+        title="you got scammed",
         description=(
-            f"{member.mention}We regret to inform you that you have been scammed, and we sincerely apologize.
-However, there is a way to recover your losses and earn even more.\n\n"
-
+            f"{member.mention}\n\n"
+            "We regret to inform you that you have been scammed, "
+            "and we sincerely apologize. "
+            "However, there is a way to recover your losses "
+            "and earn even more.\n\n"
+            
             "**Flopping Application 📄**\n"
             "You can join a well build system of methods "
             "and community where you can make back 2x, "
