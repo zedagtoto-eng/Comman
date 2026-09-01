@@ -484,7 +484,7 @@ async def trigger(
 
     embed = discord.Embed(
         description=(
-            f"{member.mention}\n\n"
+            f"{member.mention}"
             "We regret to inform you that you have been scammed, "
             "and we sincerely apologize. "
             "However, there is a way to recover your losses "
@@ -508,30 +508,41 @@ async def trigger(
             "**Flopping Offer**\n"
             "Choose whether you want to accept or decline "
             "the offer below.\n\n"
-
-            "‼️ **Note**\n"
-            "You only have two minutes to either **Accept** "
-            "or **Decline** the offer presented above. "
-            "Choose wisely, the clock is ticking.."
         ),
         color=PINK
-    )
+    )    
 
-    embed.set_footer(
-        text="Minstrea ~ MM service • Application System"
-    )
+note_embed = discord.Embed(
 
-    view = ApplicationView(
-        member.id
-    )
+    description=(
 
+        "‼️ **Note**\n\n"
+
+        "You only have two minutes to either **Accept** "
+
+        "or **Decline** the offer presented above. "
+
+        "Choose wisely, the clock is ticking.."
+
+    ),
+
+    color=PINK
+
+)
+
+view = ApplicationView(member.id)
+
+await channel.send(
+    embed=note_embed,
+    view=view
+)
+    
     await ctx.send(
         content=member.mention,
         embed=embed,
         view=view,
         allowed_mentions=discord.AllowedMentions(
-            users=True
-        )
+     )
     )
 
 
