@@ -524,8 +524,8 @@ note_embed = discord.Embed(
         
 view = ApplicationView(member.id)
 
-      # Main embed
-      await ctx.send(
+    # Main embed
+    await ctx.send(
         content=member.mention,
         embed=embed,
         allowed_mentions=discord.AllowedMentions(users=True)
