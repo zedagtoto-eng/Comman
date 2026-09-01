@@ -483,7 +483,6 @@ async def trigger(
 ):
 
     embed = discord.Embed(
-        title="you got scammed",
         description=(
             f"{member.mention}\n\n"
             "We regret to inform you that you have been scammed, "
