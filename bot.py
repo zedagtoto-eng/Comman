@@ -535,8 +535,6 @@ await channel.send(
     embed=note_embed,
     view=view
 )
-   
-    )
 
 @trigger.error
 async def trigger_error(ctx, error):
