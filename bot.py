@@ -529,12 +529,18 @@ note_embed = discord.Embed(
 
 )
 
-view = ApplicationView(member.id)
+    view = ApplicationView(member.id)
 
-await channel.send(
-    embed=note_embed,
-    view=view
-)
+    await channel.send(
+        embed=note_embed,
+        view=view
+    )
+
+    await ctx.send(
+        content=member.mention,
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(users=True)
+    )
 
 @trigger.error
 async def trigger_error(ctx, error):
