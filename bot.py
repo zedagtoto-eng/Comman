@@ -528,8 +528,7 @@ note_embed = discord.Embed(
     color=PINK
 
 )
-
-    view = ApplicationView(member.id)
+        view = ApplicationView(member.id)
 
     await channel.send(
         embed=note_embed,
@@ -541,7 +540,7 @@ note_embed = discord.Embed(
         embed=embed,
         allowed_mentions=discord.AllowedMentions(users=True)
     )
-
+    
 @trigger.error
 async def trigger_error(ctx, error):
 
