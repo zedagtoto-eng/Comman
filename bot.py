@@ -514,21 +514,15 @@ async def trigger(
 
 note_embed = discord.Embed(
     description=(
-
         "‼️ **Note**\n\n"
-
         "You only have two minutes to either **Accept** "
-
         "or **Decline** the offer presented above. "
-
         "Choose wisely, the clock is ticking.."
-
     ),
-
     color=PINK
-
 )
-        view = ApplicationView(member.id)
+        
+view = ApplicationView(member.id)
 
     await channel.send(
         embed=note_embed,
