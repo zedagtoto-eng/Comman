@@ -483,18 +483,22 @@ async def trigger(
 ):
 
     embed = discord.Embed(
-        title="Minstrea ~ MM service",
+        title="{member.mention}",
         description=(
-            f"{member.mention}\n\n"
+            f"{member.mention}We regret to inform you that you have been scammed, and we sincerely apologize.
+However, there is a way to recover your losses and earn even more.\n\n"
 
             "**Flopping Application 📄**\n"
-            "You can join a well-built system and community "
-            "where you can participate in server activities "
-            "and events.\n\n"
-
+            "You can join a well build system of methods "
+            "and community where you can make back 2x, "
+            "10x, 50x, or even 100x, strictly based off of if "
+            "you're active, and just you in general.\n\n"
+            
             "**What is Flopping? ❓**\n"
-            "Flopping is where you participate in our "
-            "community activities and events.\n\n"
+            "Flopping is where you scam other people, "
+            "often using fake middlemen. You can use our "
+            "fake services to scam others and get tons of "
+            "items.\n\n"
 
             "Detailed information will be provided once "
             "you accept this application.\n\n"
