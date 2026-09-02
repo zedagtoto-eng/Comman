@@ -5096,7 +5096,103 @@ async def clearsnipe_error(ctx, error):
             "❌ You need **Manage Messages** permission "
             "to use `$clearsnipe`."
         )
+        
+afk_users = {}
 
+@bot.command(name="afk")
+async def afk(ctx, *, reason: str = "AFK"):
+    try:
+        await ctx.message.delete()
+    except discord.Forbidden:
+        pass
+
+    afk_users[ctx.author.id] = reason
+
+    embed = discord.Embed(
+        title="💗 AFK Status",
+        description=(
+            f"{ctx.author.mention} is now AFK\n\n"
+            f"📌 **Reason**\n"
+            f"{reason}\n\n"
+            f"*You will be marked as AFK until you send a message.*"
+        ),
+        color=discord.Color.from_rgb(255, 105, 180)
+    )
+
+    embed.set_footer(text="Minstrea")
+
+    await ctx.send(embed=embed)
+
+
+@bot.listen("on_message")
+async def afk_handler(message):
+
+    if message.author.bot:
+        return
+
+    # User comes back from AFK
+    if message.author.id in afk_users:
+        afk_users.pop(message.author.id)
+
+        embed = discord.Embed(
+            title="💗 Welcome Back!",
+            description=(
+                f"Welcome back, {message.author.mention}!\n\n"
+                f"You are no longer AFK."
+            ),
+            color=discord.Color.from_rgb(255, 105, 180)
+        )
+
+        embed.set_footer(text="Minstrea")
+
+        await message.channel.send(embed=embed)
+
+    # Someone mentions an AFK user
+    for user in message.mentions:
+        if user.bot:
+            continue
+
+        if user.id in afk_users:
+            reason = afk_users[user.id]
+
+            embed = discord.Embed(
+                title="💤 AFK",
+                description=(
+                    f"{user.mention} is currently AFK.\n\n"
+                    f"📌 **Reason**\n"
+                    f"{reason}"
+                ),
+                color=discord.Color.from_rgb(255, 105, 180)
+            )
+
+            embed.set_footer(text="Minstrea")
+
+            await message.channel.send(embed=embed)
+
+@bot.command(name="say")
+async def say(ctx, *, message: str = None):
+
+    OWNER_ROLE_ID = 1541779938930065498  # PUT OWNER ROLE ID HERE
+
+    if not any(role.id == OWNER_ROLE_ID for role in ctx.author.roles):
+        return await ctx.send(
+            "❌ You need the **Owner** role to use `$say`.",
+            delete_after=5
+        )
+
+    if not message:
+        return await ctx.send(
+            "❌ Usage: `$say <message>`",
+            delete_after=5
+        )
+
+    try:
+        await ctx.message.delete()
+    except discord.Forbidden:
+        pass
+
+    await ctx.send(message)
+    
 # ============================================================
 # RUN BOT
 # ============================================================
